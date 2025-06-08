@@ -122,8 +122,8 @@ Partial Class frmMain
         ' splitContainer1.Panel2
         ' 
         splitContainer1.Panel2.Controls.Add(rightPanel)
-        splitContainer1.Size = New Size(1138, 646)
-        splitContainer1.SplitterDistance = 379
+        splitContainer1.Size = New Size(1066, 591)
+        splitContainer1.SplitterDistance = 279
         splitContainer1.SplitterWidth = 6
         splitContainer1.TabIndex = 0
         ' 
@@ -134,7 +134,7 @@ Partial Class frmMain
         leftPanel.Location = New Point(0, 0)
         leftPanel.Name = "leftPanel"
         leftPanel.Padding = New Padding(8)
-        leftPanel.Size = New Size(379, 646)
+        leftPanel.Size = New Size(279, 591)
         leftPanel.TabIndex = 0
         ' 
         ' grpFileSelection
@@ -146,7 +146,7 @@ Partial Class frmMain
         grpFileSelection.Location = New Point(8, 8)
         grpFileSelection.Name = "grpFileSelection"
         grpFileSelection.Padding = New Padding(8)
-        grpFileSelection.Size = New Size(363, 630)
+        grpFileSelection.Size = New Size(263, 575)
         grpFileSelection.TabIndex = 0
         grpFileSelection.TabStop = False
         grpFileSelection.Text = "File Selection"
@@ -161,7 +161,7 @@ Partial Class frmMain
         treeView1.HideSelection = False
         treeView1.Location = New Point(8, 26)
         treeView1.Name = "treeView1"
-        treeView1.Size = New Size(347, 556)
+        treeView1.Size = New Size(247, 501)
         treeView1.TabIndex = 0
         ' 
         ' contextMenuStrip1
@@ -188,9 +188,9 @@ Partial Class frmMain
         pnlTreeActions.Controls.Add(btnExpandAll)
         pnlTreeActions.Controls.Add(btnRefreshTree)
         pnlTreeActions.Dock = DockStyle.Bottom
-        pnlTreeActions.Location = New Point(8, 582)
+        pnlTreeActions.Location = New Point(8, 527)
         pnlTreeActions.Name = "pnlTreeActions"
-        pnlTreeActions.Size = New Size(347, 40)
+        pnlTreeActions.Size = New Size(247, 40)
         pnlTreeActions.TabIndex = 1
         ' 
         ' btnCollapseAll
@@ -241,7 +241,7 @@ Partial Class frmMain
         rightPanel.Location = New Point(0, 0)
         rightPanel.Name = "rightPanel"
         rightPanel.Padding = New Padding(4, 8, 8, 8)
-        rightPanel.Size = New Size(753, 646)
+        rightPanel.Size = New Size(781, 591)
         rightPanel.TabIndex = 0
         ' 
         ' grpCombineActions
@@ -249,10 +249,10 @@ Partial Class frmMain
         grpCombineActions.Anchor = AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
         grpCombineActions.Controls.Add(pnlCombineControls)
         grpCombineActions.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
-        grpCombineActions.Location = New Point(4, 541)
+        grpCombineActions.Location = New Point(4, 486)
         grpCombineActions.Name = "grpCombineActions"
         grpCombineActions.Padding = New Padding(8)
-        grpCombineActions.Size = New Size(741, 97)
+        grpCombineActions.Size = New Size(769, 97)
         grpCombineActions.TabIndex = 2
         grpCombineActions.TabStop = False
         grpCombineActions.Text = "Combine Files"
@@ -266,7 +266,7 @@ Partial Class frmMain
         pnlCombineControls.Font = New Font("Segoe UI", 9F)
         pnlCombineControls.Location = New Point(8, 26)
         pnlCombineControls.Name = "pnlCombineControls"
-        pnlCombineControls.Size = New Size(725, 63)
+        pnlCombineControls.Size = New Size(753, 63)
         pnlCombineControls.TabIndex = 0
         ' 
         ' progressBar1
@@ -274,7 +274,7 @@ Partial Class frmMain
         progressBar1.Anchor = AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
         progressBar1.Location = New Point(224, 31)
         progressBar1.Name = "progressBar1"
-        progressBar1.Size = New Size(490, 20)
+        progressBar1.Size = New Size(518, 20)
         progressBar1.Style = ProgressBarStyle.Continuous
         progressBar1.TabIndex = 5
         progressBar1.Visible = False
@@ -312,7 +312,7 @@ Partial Class frmMain
         grpProjectSettings.Location = New Point(4, 128)
         grpProjectSettings.Name = "grpProjectSettings"
         grpProjectSettings.Padding = New Padding(8)
-        grpProjectSettings.Size = New Size(741, 410)
+        grpProjectSettings.Size = New Size(769, 355)
         grpProjectSettings.TabIndex = 1
         grpProjectSettings.TabStop = False
         grpProjectSettings.Text = "Project Configuration"
@@ -331,8 +331,8 @@ Partial Class frmMain
         ' splitContainer2.Panel2
         ' 
         splitContainer2.Panel2.Controls.Add(pnlProjectBottom)
-        splitContainer2.Size = New Size(725, 376)
-        splitContainer2.SplitterDistance = 189
+        splitContainer2.Size = New Size(753, 321)
+        splitContainer2.SplitterDistance = 286
         splitContainer2.TabIndex = 0
         ' 
         ' pnlProjectTop
@@ -341,7 +341,7 @@ Partial Class frmMain
         pnlProjectTop.Dock = DockStyle.Fill
         pnlProjectTop.Location = New Point(0, 0)
         pnlProjectTop.Name = "pnlProjectTop"
-        pnlProjectTop.Size = New Size(725, 189)
+        pnlProjectTop.Size = New Size(753, 286)
         pnlProjectTop.TabIndex = 0
         ' 
         ' tlpProjectTop
@@ -363,7 +363,7 @@ Partial Class frmMain
         tlpProjectTop.RowStyles.Add(New RowStyle(SizeType.Absolute, 35F))
         tlpProjectTop.RowStyles.Add(New RowStyle(SizeType.Absolute, 35F))
         tlpProjectTop.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
-        tlpProjectTop.Size = New Size(725, 189)
+        tlpProjectTop.Size = New Size(753, 286)
         tlpProjectTop.TabIndex = 0
         ' 
         ' lblProjectType
@@ -383,7 +383,7 @@ Partial Class frmMain
         cmbProjectType.FormattingEnabled = True
         cmbProjectType.Location = New Point(133, 6)
         cmbProjectType.Name = "cmbProjectType"
-        cmbProjectType.Size = New Size(589, 23)
+        cmbProjectType.Size = New Size(617, 23)
         cmbProjectType.TabIndex = 1
         ' 
         ' lblProjectTitle
@@ -401,7 +401,7 @@ Partial Class frmMain
         txtProjectTitle.Anchor = AnchorStyles.Left Or AnchorStyles.Right
         txtProjectTitle.Location = New Point(133, 41)
         txtProjectTitle.Name = "txtProjectTitle"
-        txtProjectTitle.Size = New Size(589, 23)
+        txtProjectTitle.Size = New Size(617, 23)
         txtProjectTitle.TabIndex = 3
         ' 
         ' lblProjectInstructions
@@ -421,7 +421,7 @@ Partial Class frmMain
         txtProjectInstructions.Multiline = True
         txtProjectInstructions.Name = "txtProjectInstructions"
         txtProjectInstructions.ScrollBars = ScrollBars.Vertical
-        txtProjectInstructions.Size = New Size(589, 113)
+        txtProjectInstructions.Size = New Size(617, 210)
         txtProjectInstructions.TabIndex = 5
         ' 
         ' pnlProjectBottom
@@ -431,7 +431,7 @@ Partial Class frmMain
         pnlProjectBottom.Dock = DockStyle.Fill
         pnlProjectBottom.Location = New Point(0, 0)
         pnlProjectBottom.Name = "pnlProjectBottom"
-        pnlProjectBottom.Size = New Size(725, 183)
+        pnlProjectBottom.Size = New Size(753, 31)
         pnlProjectBottom.TabIndex = 0
         ' 
         ' lblOtherInstructions
@@ -452,7 +452,7 @@ Partial Class frmMain
         txtOtherInstructions.Multiline = True
         txtOtherInstructions.Name = "txtOtherInstructions"
         txtOtherInstructions.ScrollBars = ScrollBars.Vertical
-        txtOtherInstructions.Size = New Size(589, 174)
+        txtOtherInstructions.Size = New Size(617, 22)
         txtOtherInstructions.TabIndex = 7
         ' 
         ' grpTemplateManager
@@ -463,7 +463,7 @@ Partial Class frmMain
         grpTemplateManager.Location = New Point(4, 8)
         grpTemplateManager.Name = "grpTemplateManager"
         grpTemplateManager.Padding = New Padding(8)
-        grpTemplateManager.Size = New Size(741, 120)
+        grpTemplateManager.Size = New Size(769, 120)
         grpTemplateManager.TabIndex = 0
         grpTemplateManager.TabStop = False
         grpTemplateManager.Text = "Template Manager"
@@ -490,7 +490,7 @@ Partial Class frmMain
         tlpTemplateControls.RowCount = 2
         tlpTemplateControls.RowStyles.Add(New RowStyle(SizeType.Percent, 50F))
         tlpTemplateControls.RowStyles.Add(New RowStyle(SizeType.Percent, 50F))
-        tlpTemplateControls.Size = New Size(725, 86)
+        tlpTemplateControls.Size = New Size(753, 86)
         tlpTemplateControls.TabIndex = 0
         ' 
         ' lblTemplateName
@@ -508,7 +508,7 @@ Partial Class frmMain
         txtTemplateName.Anchor = AnchorStyles.Left Or AnchorStyles.Right
         txtTemplateName.Location = New Point(134, 10)
         txtTemplateName.Name = "txtTemplateName"
-        txtTemplateName.Size = New Size(447, 23)
+        txtTemplateName.Size = New Size(468, 23)
         txtTemplateName.TabIndex = 1
         ' 
         ' btnSaveTemplate
@@ -517,9 +517,9 @@ Partial Class frmMain
         btnSaveTemplate.BackColor = Color.FromArgb(CByte(40), CByte(167), CByte(69))
         btnSaveTemplate.FlatStyle = FlatStyle.Flat
         btnSaveTemplate.ForeColor = Color.White
-        btnSaveTemplate.Location = New Point(587, 3)
+        btnSaveTemplate.Location = New Point(608, 3)
         btnSaveTemplate.Name = "btnSaveTemplate"
-        btnSaveTemplate.Size = New Size(66, 37)
+        btnSaveTemplate.Size = New Size(70, 37)
         btnSaveTemplate.TabIndex = 2
         btnSaveTemplate.Text = "Save"
         btnSaveTemplate.UseVisualStyleBackColor = False
@@ -541,7 +541,7 @@ Partial Class frmMain
         cmbTemplate.FormattingEnabled = True
         cmbTemplate.Location = New Point(134, 53)
         cmbTemplate.Name = "cmbTemplate"
-        cmbTemplate.Size = New Size(447, 23)
+        cmbTemplate.Size = New Size(468, 23)
         cmbTemplate.TabIndex = 4
         ' 
         ' btnLoadTemplate
@@ -550,9 +550,9 @@ Partial Class frmMain
         btnLoadTemplate.BackColor = Color.FromArgb(CByte(0), CByte(120), CByte(215))
         btnLoadTemplate.FlatStyle = FlatStyle.Flat
         btnLoadTemplate.ForeColor = Color.White
-        btnLoadTemplate.Location = New Point(587, 46)
+        btnLoadTemplate.Location = New Point(608, 46)
         btnLoadTemplate.Name = "btnLoadTemplate"
-        btnLoadTemplate.Size = New Size(66, 37)
+        btnLoadTemplate.Size = New Size(70, 37)
         btnLoadTemplate.TabIndex = 5
         btnLoadTemplate.Text = "Load"
         btnLoadTemplate.UseVisualStyleBackColor = False
@@ -563,9 +563,9 @@ Partial Class frmMain
         btnCopyTemplate.BackColor = Color.FromArgb(CByte(108), CByte(117), CByte(125))
         btnCopyTemplate.FlatStyle = FlatStyle.Flat
         btnCopyTemplate.ForeColor = Color.White
-        btnCopyTemplate.Location = New Point(659, 46)
+        btnCopyTemplate.Location = New Point(684, 46)
         btnCopyTemplate.Name = "btnCopyTemplate"
-        btnCopyTemplate.Size = New Size(63, 37)
+        btnCopyTemplate.Size = New Size(66, 37)
         btnCopyTemplate.TabIndex = 6
         btnCopyTemplate.Text = "Copy"
         btnCopyTemplate.UseVisualStyleBackColor = False
@@ -576,9 +576,9 @@ Partial Class frmMain
         btnUpdateTemplate.BackColor = Color.FromArgb(CByte(255), CByte(193), CByte(7))
         btnUpdateTemplate.FlatStyle = FlatStyle.Flat
         btnUpdateTemplate.ForeColor = Color.Black
-        btnUpdateTemplate.Location = New Point(659, 3)
+        btnUpdateTemplate.Location = New Point(684, 3)
         btnUpdateTemplate.Name = "btnUpdateTemplate"
-        btnUpdateTemplate.Size = New Size(63, 37)
+        btnUpdateTemplate.Size = New Size(66, 37)
         btnUpdateTemplate.TabIndex = 7
         btnUpdateTemplate.Text = "Update"
         btnUpdateTemplate.UseVisualStyleBackColor = False
@@ -588,7 +588,7 @@ Partial Class frmMain
         menuStrip1.Items.AddRange(New ToolStripItem() {fileToolStripMenuItem, settingsToolStripMenuItem, helpToolStripMenuItem})
         menuStrip1.Location = New Point(0, 0)
         menuStrip1.Name = "menuStrip1"
-        menuStrip1.Size = New Size(1138, 24)
+        menuStrip1.Size = New Size(1066, 24)
         menuStrip1.TabIndex = 1
         ' 
         ' fileToolStripMenuItem
@@ -673,10 +673,10 @@ Partial Class frmMain
         ' statusStrip1
         ' 
         statusStrip1.Items.AddRange(New ToolStripItem() {toolStripStatusLabel1, toolStripProgressBar1, toolStripStatusLabelFiles})
-        statusStrip1.Location = New Point(0, 670)
+        statusStrip1.Location = New Point(0, 615)
         statusStrip1.Name = "statusStrip1"
         statusStrip1.Padding = New Padding(1, 0, 16, 0)
-        statusStrip1.Size = New Size(1138, 22)
+        statusStrip1.Size = New Size(1066, 22)
         statusStrip1.TabIndex = 2
         ' 
         ' toolStripStatusLabel1
@@ -717,7 +717,7 @@ Partial Class frmMain
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         BackColor = Color.FromArgb(CByte(248), CByte(249), CByte(250))
-        ClientSize = New Size(1138, 692)
+        ClientSize = New Size(1066, 637)
         Controls.Add(splitContainer1)
         Controls.Add(statusStrip1)
         Controls.Add(menuStrip1)

@@ -1,4 +1,5 @@
 ﻿Imports System.IO
+Imports System.Text.RegularExpressions
 
 Public Class frmSettings
     Public Property ProjectFolderPath As String = ""
@@ -7,10 +8,31 @@ Public Class frmSettings
     Public Property IncludeDatabase As Boolean = False
     Public Property ExcludedFolders As New List(Of String)
 
+    ' File extension management with regex support
+    Public Property VBDesktopExtensions As New List(Of String)
+    Public Property AspCoreExtensions As New List(Of String)
+    Public Property AspMvcExtensions As New List(Of String)
+
     ' Default excluded folders
-    Private ReadOnly DefaultExcludedFolders As String() = {".git", ".vs", ".svn", "repobundle", "Resource"}
+    Private ReadOnly DefaultExcludedFolders As String() = {".git", ".vs", ".svn", "bin", "obj", "packages", "node_modules"}
+
+    ' Default file extensions with regex patterns
+    Private ReadOnly DefaultVBExtensions As String() = {"*.vb", "*.designer.vb", "*.vbproj", "*.resx", "*.config", "*.sql"}
+    Private ReadOnly DefaultAspCoreExtensions As String() = {"*.cs", "^_.*\.cshtml$", "site.css", "site.js", "*.json", "*.sql"}
+    Private ReadOnly DefaultAspMvcExtensions As String() = {"*.cs", "*.cshtml", "*.css", "*.js", "*.config", "*.sql"}
 
     Private Sub frmSettings_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ' Initialize extension lists if empty
+        If VBDesktopExtensions.Count = 0 Then
+            VBDesktopExtensions.AddRange(DefaultVBExtensions)
+        End If
+        If AspCoreExtensions.Count = 0 Then
+            AspCoreExtensions.AddRange(DefaultAspCoreExtensions)
+        End If
+        If AspMvcExtensions.Count = 0 Then
+            AspMvcExtensions.AddRange(DefaultAspMvcExtensions)
+        End If
+
         ' Load current settings into the form
         txtProjectFolder.Text = ProjectFolderPath
         txtOutputFolder.Text = OutputFolderPath
@@ -30,9 +52,199 @@ Public Class frmSettings
         ' Enable/disable database controls based on checkbox
         UpdateDatabaseControls()
 
+        ' Initialize project type combo
+        cmbProjectTypeSettings.Items.AddRange({"Visual Basic Desktop", "Asp MVC 5", "Asp Dotnet Core 8"})
+        cmbProjectTypeSettings.SelectedIndex = 0
+
+        ' Update extensions list
+        UpdateExtensionsList()
+
         ' Add event handlers
         AddHandler txtNewExcludedFolder.KeyDown, AddressOf txtNewExcludedFolder_KeyDown
+        AddHandler txtNewExtension.KeyDown, AddressOf txtNewExtension_KeyDown
+        AddHandler cmbProjectTypeSettings.SelectedIndexChanged, AddressOf cmbProjectTypeSettings_SelectedIndexChanged
+
+        ' Add tooltip for regex help
+        SetupExtensionTooltips()
     End Sub
+
+    Private Sub SetupExtensionTooltips()
+        Dim toolTip As New ToolTip()
+        toolTip.AutoPopDelay = 10000
+        toolTip.InitialDelay = 1000
+        toolTip.ReshowDelay = 500
+        toolTip.ShowAlways = True
+
+        ' Enhanced tooltip for extension help
+        Dim tooltipText As String = "Extension Pattern Examples:" & vbCrLf &
+                                  "• *.css - All CSS files" & vbCrLf &
+                                  "• site.css - Specific file name" & vbCrLf &
+                                  "• ^_.*\.cshtml$ - CSHTML files starting with underscore" & vbCrLf &
+                                  "• ^(?!_).*\.cshtml$ - CSHTML files NOT starting with underscore" & vbCrLf &
+                                  "• .*\.min\.js$ - All minified JS files" & vbCrLf &
+                                  "• Use ^ for start, $ for end, .* for any characters"
+
+        toolTip.SetToolTip(lblExtensionHelp, tooltipText)
+        toolTip.SetToolTip(txtNewExtension, tooltipText)
+    End Sub
+
+    Private Sub cmbProjectTypeSettings_SelectedIndexChanged(sender As Object, e As EventArgs)
+        UpdateExtensionsList()
+        UpdateExtensionHelpText()
+    End Sub
+
+    Private Sub UpdateExtensionHelpText()
+        Select Case cmbProjectTypeSettings.SelectedIndex
+            Case 0 ' Visual Basic Desktop
+                lblExtensionHelp.Text = "VB: Use *.ext for wildcards or filename.ext for specific files"
+            Case 1 ' Asp MVC 5
+                lblExtensionHelp.Text = "MVC: Use *.ext for wildcards or filename.ext for specific files"
+            Case 2 ' Asp Dotnet Core 8
+                lblExtensionHelp.Text = "Core: Use regex like ^_.*\.cshtml$ for underscore files, *.ext for wildcards"
+        End Select
+    End Sub
+
+    Private Sub UpdateExtensionsList()
+        lstExtensions.Items.Clear()
+
+        Select Case cmbProjectTypeSettings.SelectedIndex
+            Case 0 ' Visual Basic Desktop
+                For Each ext In VBDesktopExtensions
+                    lstExtensions.Items.Add(ext)
+                Next
+            Case 1 ' Asp MVC 5
+                For Each ext In AspMvcExtensions
+                    lstExtensions.Items.Add(ext)
+                Next
+            Case 2 ' Asp Dotnet Core 8
+                For Each ext In AspCoreExtensions
+                    lstExtensions.Items.Add(ext)
+                Next
+        End Select
+    End Sub
+
+    Private Sub btnAddExtension_Click(sender As Object, e As EventArgs) Handles btnAddExtension.Click
+        AddExtension()
+    End Sub
+
+    Private Sub txtNewExtension_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            AddExtension()
+        End If
+    End Sub
+
+    Private Sub AddExtension()
+        Dim extension As String = txtNewExtension.Text.Trim()
+
+        If String.IsNullOrWhiteSpace(extension) Then
+            MessageBox.Show("Please enter a file extension or pattern.", "Input Required", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtNewExtension.Focus()
+            Return
+        End If
+
+        ' Validate regex pattern if it looks like regex
+        If IsRegexPattern(extension) Then
+            If Not ValidateRegexPattern(extension) Then
+                MessageBox.Show("Invalid regex pattern. Please check your syntax.", "Invalid Regex", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                txtNewExtension.SelectAll()
+                txtNewExtension.Focus()
+                Return
+            End If
+        Else
+            ' Auto-format simple patterns
+            If Not extension.StartsWith("*") AndAlso Not extension.Contains(".") Then
+                extension = "*." + extension
+            End If
+        End If
+
+        Dim currentList As List(Of String) = GetCurrentExtensionList()
+
+        If currentList.Contains(extension) Then
+            MessageBox.Show($"Extension '{extension}' already exists.", "Duplicate Extension", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            txtNewExtension.SelectAll()
+            txtNewExtension.Focus()
+            Return
+        End If
+
+        currentList.Add(extension)
+        UpdateExtensionsList()
+        txtNewExtension.Clear()
+        txtNewExtension.Focus()
+
+        ' Show success message for regex patterns
+        If IsRegexPattern(extension) Then
+            MessageBox.Show($"Regex pattern '{extension}' added successfully!", "Pattern Added", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        End If
+    End Sub
+
+    Private Function IsRegexPattern(pattern As String) As Boolean
+        ' Check if the pattern contains regex metacharacters
+        Return pattern.Contains("^") OrElse pattern.Contains("$") OrElse
+               pattern.Contains("(") OrElse pattern.Contains(")") OrElse
+               pattern.Contains("[") OrElse pattern.Contains("]") OrElse
+               pattern.Contains("?") OrElse pattern.Contains("+") OrElse
+               (pattern.Contains(".") AndAlso pattern.Contains("\"))
+    End Function
+
+    Private Function ValidateRegexPattern(pattern As String) As Boolean
+        Try
+            ' Test the regex pattern
+            Dim regex As New Regex(pattern)
+            ' Test with some sample filenames
+            regex.IsMatch("_Layout.cshtml")
+            regex.IsMatch("Create.cshtml")
+            regex.IsMatch("site.css")
+            Return True
+        Catch ex As Exception
+            Return False
+        End Try
+    End Function
+
+    Private Sub btnRemoveExtension_Click(sender As Object, e As EventArgs) Handles btnRemoveExtension.Click
+        If lstExtensions.SelectedIndex >= 0 Then
+            Dim selectedExtension As String = lstExtensions.SelectedItem.ToString()
+            Dim currentList As List(Of String) = GetCurrentExtensionList()
+
+            currentList.Remove(selectedExtension)
+            UpdateExtensionsList()
+        Else
+            MessageBox.Show("Please select an extension to remove.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        End If
+    End Sub
+
+    Private Sub btnResetExtensions_Click(sender As Object, e As EventArgs) Handles btnResetExtensions.Click
+        Dim projectType As String = cmbProjectTypeSettings.SelectedItem.ToString()
+        Dim result As DialogResult = MessageBox.Show($"Reset extensions for '{projectType}' to default values?", "Confirm Reset", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+
+        If result = DialogResult.Yes Then
+            Select Case cmbProjectTypeSettings.SelectedIndex
+                Case 0 ' Visual Basic Desktop
+                    VBDesktopExtensions.Clear()
+                    VBDesktopExtensions.AddRange(DefaultVBExtensions)
+                Case 1 ' Asp MVC 5
+                    AspMvcExtensions.Clear()
+                    AspMvcExtensions.AddRange(DefaultAspMvcExtensions)
+                Case 2 ' Asp Dotnet Core 8
+                    AspCoreExtensions.Clear()
+                    AspCoreExtensions.AddRange(DefaultAspCoreExtensions)
+            End Select
+            UpdateExtensionsList()
+        End If
+    End Sub
+
+    Private Function GetCurrentExtensionList() As List(Of String)
+        Select Case cmbProjectTypeSettings.SelectedIndex
+            Case 0 ' Visual Basic Desktop
+                Return VBDesktopExtensions
+            Case 1 ' Asp MVC 5
+                Return AspMvcExtensions
+            Case 2 ' Asp Dotnet Core 8
+                Return AspCoreExtensions
+            Case Else
+                Return New List(Of String)
+        End Select
+    End Function
 
     Private Sub UpdateExcludedFoldersList()
         ' Clear and update the excluded folders display
@@ -256,6 +468,11 @@ Public Class frmSettings
             End If
         End If
 
+        ' Validate regex patterns in extensions
+        If Not ValidateAllExtensionPatterns() Then
+            Return
+        End If
+
         ' Validate database settings
         If chkIncludeDatabase.Checked Then
             If DatabaseFiles.Count = 0 Then
@@ -310,32 +527,29 @@ Public Class frmSettings
         Close()
     End Sub
 
+    Private Function ValidateAllExtensionPatterns() As Boolean
+        ' Validate all extension lists for regex patterns
+        Dim allExtensions As New List(Of String)
+        allExtensions.AddRange(VBDesktopExtensions)
+        allExtensions.AddRange(AspCoreExtensions)
+        allExtensions.AddRange(AspMvcExtensions)
+
+        For Each pattern In allExtensions
+            If IsRegexPattern(pattern) Then
+                If Not ValidateRegexPattern(pattern) Then
+                    MessageBox.Show($"Invalid regex pattern found: '{pattern}'" & vbCrLf & vbCrLf &
+                                  "Please fix or remove this pattern before saving.", "Invalid Regex Pattern", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                    Return False
+                End If
+            End If
+        Next
+
+        Return True
+    End Function
+
     Private Sub btnCancel_Click(sender As Object, e As EventArgs) Handles btnCancel.Click
         DialogResult = DialogResult.Cancel
         Close()
     End Sub
-
-    ' === HELPER METHODS ===
-    Public Sub LoadExcludedFoldersFromString(excludedFoldersString As String)
-        ExcludedFolders.Clear()
-        If Not String.IsNullOrWhiteSpace(excludedFoldersString) Then
-            Dim folders() As String = excludedFoldersString.Split(New Char() {","c, ";"c}, StringSplitOptions.RemoveEmptyEntries)
-            For Each folder In folders
-                Dim trimmedFolder As String = folder.Trim()
-                If Not String.IsNullOrWhiteSpace(trimmedFolder) Then
-                    ExcludedFolders.Add(trimmedFolder)
-                End If
-            Next
-        End If
-
-        ' Ensure we have at least the default folders
-        If ExcludedFolders.Count = 0 Then
-            ExcludedFolders.AddRange(DefaultExcludedFolders)
-        End If
-    End Sub
-
-    Public Function GetExcludedFoldersAsString() As String
-        Return String.Join(",", ExcludedFolders)
-    End Function
 
 End Class

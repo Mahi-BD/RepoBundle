@@ -19,16 +19,18 @@ Public Class frmMain
     Private otherInstructions As String = ""
     Private isUpdatingNodes As Boolean = False
     Private isLoadingTemplate As Boolean = False
-
+    Private vbDesktopExtensions As New List(Of String)
+    Private aspCoreExtensions As New List(Of String)
+    Private aspMvcExtensions As New List(Of String)
+    Private configSaveTimer As System.Windows.Forms.Timer = Nothing
     Private Sub InitializeApplication()
-        ' Initialize INI helpers
         iniHelper = New IniHelper(Path.Combine(Application.StartupPath, "config.ini"))
         templateIni = New IniHelper(Path.Combine(Application.StartupPath, "template.ini"))
 
         ' Initialize project types
         cmbProjectType.Items.AddRange({"Visual Basic Desktop", "Asp MVC 5", "Asp Dotnet Core 8"})
 
-        ' Load configuration
+        ' Load configuration FIRST
         LoadConfiguration()
         LoadTemplates()
 
@@ -68,10 +70,10 @@ Public Class frmMain
         btnCopyTemplate.Enabled = (cmbTemplate.Items.Count > 0 AndAlso cmbTemplate.SelectedItem IsNot Nothing)
         btnUpdateTemplate.Enabled = (cmbTemplate.Items.Count > 0 AndAlso cmbTemplate.SelectedItem IsNot Nothing)
 
-        ' Add event handlers for auto-save
-        AddHandler txtProjectTitle.TextChanged, AddressOf ConfigurationChanged
-        AddHandler txtProjectInstructions.TextChanged, AddressOf ConfigurationChanged
-        AddHandler txtOtherInstructions.TextChanged, AddressOf ConfigurationChanged
+        ' Add event handlers for auto-save with proper timing
+        AddHandler txtProjectTitle.TextChanged, AddressOf DelayedConfigurationSave
+        AddHandler txtProjectInstructions.TextChanged, AddressOf DelayedConfigurationSave
+        AddHandler txtOtherInstructions.TextChanged, AddressOf DelayedConfigurationSave
 
         ' Add event handlers for split container position saving
         AddHandler splitContainer1.SplitterMoved, AddressOf SplitContainer_SplitterMoved
@@ -85,6 +87,27 @@ Public Class frmMain
         End If
     End Sub
 
+
+    Private Sub DelayedConfigurationSave(sender As Object, e As EventArgs)
+        ' Cancel previous timer if it exists
+        If configSaveTimer IsNot Nothing Then
+            configSaveTimer.Stop()
+            configSaveTimer.Dispose()
+        End If
+
+        ' Create new timer for delayed save
+        configSaveTimer = New System.Windows.Forms.Timer()
+        configSaveTimer.Interval = 2000 ' 2 second delay
+        AddHandler configSaveTimer.Tick, Sub()
+                                             SaveConfiguration()
+                                             configSaveTimer.Stop()
+                                             configSaveTimer.Dispose()
+                                             configSaveTimer = Nothing
+                                         End Sub
+        configSaveTimer.Start()
+    End Sub
+
+    ' === IMPROVED LOAD CONFIGURATION ===
     Private Sub LoadConfiguration()
         ' Load main configuration
         projectFolder = iniHelper.ReadValue("Main", "ProjectFolder", "")
@@ -93,7 +116,7 @@ Public Class frmMain
         lastSelectedTemplate = iniHelper.ReadValue("Main", "LastSelectedTemplate", "")
         lastSelectedProjectType = iniHelper.ReadValue("Main", "LastSelectedProjectType", "")
 
-        ' Load excluded folders - FIXED: Added dynamic excluded folders loading
+        ' Load excluded folders
         Dim excludedFoldersString As String = iniHelper.ReadValue("Backup", "ExcludedFolders", ".git,.vs,.svn,bin,obj")
         excludedFolders.Clear()
         If Not String.IsNullOrWhiteSpace(excludedFoldersString) Then
@@ -106,7 +129,7 @@ Public Class frmMain
             Next
         End If
 
-        ' Ensure we have some excluded folders (but not too restrictive)
+        ' Ensure we have some excluded folders
         If excludedFolders.Count = 0 Then
             excludedFolders.AddRange({".git", ".vs", ".svn", "bin", "obj"})
         End If
@@ -116,15 +139,30 @@ Public Class frmMain
         projectInstructions = iniHelper.ReadValue("Project", "Instructions", "").Replace("\n", vbCrLf)
         otherInstructions = iniHelper.ReadValue("Project", "OtherInstructions", "").Replace("\n", vbCrLf)
 
-        ' Load split container positions
-        Dim splitter1Pos As String = iniHelper.ReadValue("UI", "SplitContainer1Position", "379")
-        Dim splitter2Pos As String = iniHelper.ReadValue("UI", "SplitContainer2Position", "240")
+        ' Load file extensions
+        LoadFileExtensions()
 
+        ' Load split container positions with error handling
         Try
-            splitContainer1.SplitterDistance = Integer.Parse(splitter1Pos)
-            splitContainer2.SplitterDistance = Integer.Parse(splitter2Pos)
-        Catch
+            Dim splitter1Pos As String = iniHelper.ReadValue("UI", "SplitContainer1Position", "379")
+            Dim splitter2Pos As String = iniHelper.ReadValue("UI", "SplitContainer2Position", "189")
+
+            Dim pos1 As Integer = Integer.Parse(splitter1Pos)
+            Dim pos2 As Integer = Integer.Parse(splitter2Pos)
+
+            ' Validate positions are within reasonable bounds
+            If pos1 > 100 And pos1 < Me.Width - 100 Then
+                splitContainer1.SplitterDistance = pos1
+            End If
+
+            If pos2 > 50 And pos2 < splitContainer2.Height - 50 Then
+                splitContainer2.SplitterDistance = pos2
+            End If
+
+        Catch ex As Exception
             ' Use defaults if parsing fails
+            splitContainer1.SplitterDistance = 379
+            splitContainer2.SplitterDistance = 189
         End Try
 
         ' Load database files
@@ -143,6 +181,35 @@ Public Class frmMain
         txtOtherInstructions.Text = otherInstructions
     End Sub
 
+    Private Sub LoadFileExtensions()
+        ' Load VB Desktop extensions
+        Dim vbExtString As String = iniHelper.ReadValue("Extensions", "VBDesktop", "*.vb,*.designer.vb,*.vbproj,*.resx,*.config,*.sql")
+        vbDesktopExtensions.Clear()
+        vbDesktopExtensions.AddRange(vbExtString.Split(","c).Select(Function(x) x.Trim()).Where(Function(x) Not String.IsNullOrEmpty(x)))
+
+        ' Load ASP.NET Core extensions with regex support
+        Dim coreExtString As String = iniHelper.ReadValue("Extensions", "AspCore", "*.cs,^_.*\.cshtml$,site.css,site.js,*.json,*.sql")
+        aspCoreExtensions.Clear()
+        aspCoreExtensions.AddRange(coreExtString.Split(","c).Select(Function(x) x.Trim()).Where(Function(x) Not String.IsNullOrEmpty(x)))
+
+        ' Load ASP.NET MVC extensions
+        Dim mvcExtString As String = iniHelper.ReadValue("Extensions", "AspMvc", "*.cs,*.cshtml,*.css,*.js,*.config,*.sql")
+        aspMvcExtensions.Clear()
+        aspMvcExtensions.AddRange(mvcExtString.Split(","c).Select(Function(x) x.Trim()).Where(Function(x) Not String.IsNullOrEmpty(x)))
+    End Sub
+
+    Private Sub SaveFileExtensions()
+        ' Save VB Desktop extensions
+        iniHelper.WriteValue("Extensions", "VBDesktop", String.Join(",", vbDesktopExtensions))
+
+        ' Save ASP.NET Core extensions
+        iniHelper.WriteValue("Extensions", "AspCore", String.Join(",", aspCoreExtensions))
+
+        ' Save ASP.NET MVC extensions
+        iniHelper.WriteValue("Extensions", "AspMvc", String.Join(",", aspMvcExtensions))
+    End Sub
+
+    ' === IMPROVED CONFIGURATION SAVING ===
     Private Sub SaveConfiguration()
         Try
             ' Save main configuration
@@ -152,7 +219,7 @@ Public Class frmMain
             iniHelper.WriteValue("Main", "LastSelectedTemplate", If(cmbTemplate.SelectedItem?.ToString(), ""))
             iniHelper.WriteValue("Main", "LastSelectedProjectType", If(cmbProjectType.SelectedItem?.ToString(), ""))
 
-            ' FIXED: Save excluded folders
+            ' Save excluded folders
             iniHelper.WriteValue("Backup", "ExcludedFolders", String.Join(",", excludedFolders))
 
             ' Save project information
@@ -160,9 +227,11 @@ Public Class frmMain
             iniHelper.WriteValue("Project", "Instructions", txtProjectInstructions.Text.Replace(vbCrLf, "\n"))
             iniHelper.WriteValue("Project", "OtherInstructions", txtOtherInstructions.Text.Replace(vbCrLf, "\n"))
 
-            ' Save split container positions
-            iniHelper.WriteValue("UI", "SplitContainer1Position", splitContainer1.SplitterDistance.ToString())
-            iniHelper.WriteValue("UI", "SplitContainer2Position", splitContainer2.SplitterDistance.ToString())
+            ' Save file extensions
+            SaveFileExtensions()
+
+            ' Save split container positions (call the dedicated method)
+            SaveSplitContainerPositions()
 
             ' Clear and save database files
             Dim dbFileKeys As List(Of String) = iniHelper.GetKeys("DatabaseFiles")
@@ -179,13 +248,37 @@ Public Class frmMain
         End Try
     End Sub
 
+
     Private Sub SplitContainer_SplitterMoved(sender As Object, e As SplitterEventArgs)
-        ' Auto-save split container positions
-        Static lastSave As DateTime = DateTime.MinValue
-        If DateTime.Now.Subtract(lastSave).TotalSeconds > 1 Then
-            SaveConfiguration()
-            lastSave = DateTime.Now
+        ' Auto-save split container positions with proper delay handling
+        Static lastSaveTimer As System.Windows.Forms.Timer = Nothing
+
+        ' Cancel previous timer if it exists
+        If lastSaveTimer IsNot Nothing Then
+            lastSaveTimer.Stop()
+            lastSaveTimer.Dispose()
         End If
+
+        ' Create new timer for delayed save
+        lastSaveTimer = New System.Windows.Forms.Timer()
+        lastSaveTimer.Interval = 1000 ' 1 second delay
+        AddHandler lastSaveTimer.Tick, Sub()
+                                           SaveSplitContainerPositions()
+                                           lastSaveTimer.Stop()
+                                           lastSaveTimer.Dispose()
+                                           lastSaveTimer = Nothing
+                                       End Sub
+        lastSaveTimer.Start()
+    End Sub
+
+    Private Sub SaveSplitContainerPositions()
+        Try
+            ' Save split container positions
+            iniHelper.WriteValue("UI", "SplitContainer1Position", splitContainer1.SplitterDistance.ToString())
+            iniHelper.WriteValue("UI", "SplitContainer2Position", splitContainer2.SplitterDistance.ToString())
+        Catch ex As Exception
+            ' Ignore errors during saving
+        End Try
     End Sub
 
     Private Sub ConfigurationChanged(sender As Object, e As EventArgs)
@@ -1342,6 +1435,7 @@ Public Class frmMain
     End Sub
 
     ' === COMBINE FILES WITH ENHANCED PROGRESS ===
+    ' Enhanced btnCombine_Click method for frmMain.vb
     Private Sub btnCombine_Click(sender As Object, e As EventArgs) Handles btnCombine.Click
         If String.IsNullOrWhiteSpace(projectFolder) Then
             toolStripStatusLabel1.Text = "Error: Please select a project folder first"
@@ -1386,11 +1480,15 @@ Public Class frmMain
         Me.UseWaitCursor = True
 
         Try
-            ' Step 1: Initialize (5%)
-            UpdateProgress(5, "Initializing file combination...")
+            ' Step 1: Clear existing data files (5%)
+            UpdateProgress(5, "Clearing previous output files...")
+            ClearExistingDataFiles()
 
-            ' Step 2: Analyze files (15%)
-            UpdateProgress(15, "Analyzing selected files...")
+            ' Step 2: Initialize (10%)
+            UpdateProgress(10, "Initializing file combination...")
+
+            ' Step 3: Analyze files (20%)
+            UpdateProgress(20, "Analyzing selected files...")
 
             ' Find SQL files in the selected files
             Dim selectedSqlFiles As New List(Of String)
@@ -1408,21 +1506,21 @@ Public Class frmMain
                 End If
             Next
 
-            ' Step 3: Preparation (25%)
-            UpdateProgress(25, "Preparing file list and combiner...")
+            ' Step 4: Preparation (30%)
+            UpdateProgress(30, "Preparing file list and combiner...")
 
             Dim combiner As New FileCombiner(projectFolder, outputFolder)
 
-            ' Step 4: Process files with detailed progress (25% - 85%)
+            ' Step 5: Process files with detailed progress (30% - 85%)
             Dim result As CombineResult = CombineFilesWithEnhancedProgress(combiner, checkedFiles, allSqlFiles)
 
-            ' Step 5: Finalizing (95%)
+            ' Step 6: Finalizing (95%)
             UpdateProgress(95, "Finalizing output files...")
-            System.Threading.Thread.Sleep(500) ' Brief pause to show completion
+            System.Threading.Thread.Sleep(500)
 
-            ' Step 6: Complete (100%)
+            ' Step 7: Complete (100%)
             UpdateProgress(100, "File combination complete!")
-            System.Threading.Thread.Sleep(1000) ' Show completion for 1 second
+            System.Threading.Thread.Sleep(1000)
 
             If result.Success Then
                 If allSqlFiles.Count > 0 Then
@@ -1430,18 +1528,74 @@ Public Class frmMain
                 Else
                     toolStripStatusLabel1.Text = result.Message
                 End If
+
+                ' Show completion message with option to open output folder
+                Dim message As String = $"File combination completed successfully!{vbCrLf}{vbCrLf}" &
+                                  $"Files processed: {result.FilesIncluded}{vbCrLf}" &
+                                  $"Output files created: {result.FileCount}{vbCrLf}" &
+                                  $"Output location: {outputFolder}{vbCrLf}{vbCrLf}" &
+                                  $"Would you like to open the output folder?"
+
+                Dim dialogResult As DialogResult = MessageBox.Show(message, "Combination Complete",
+                                                             MessageBoxButtons.YesNo, MessageBoxIcon.Information)
+
+                If dialogResult = DialogResult.Yes Then
+                    goToOutputToolStripMenuItem_Click(sender, e)
+                End If
             Else
                 toolStripStatusLabel1.Text = "Error: " & result.Message
+                MessageBox.Show("Error during file combination: " & result.Message,
+                          "Combination Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
             End If
 
         Catch ex As Exception
             toolStripStatusLabel1.Text = "Error combining files: " & ex.Message
+            MessageBox.Show("Unexpected error during file combination: " & ex.Message,
+                      "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
         Finally
             ' Hide progress and restore controls
             HideProgress()
             btnCombine.Enabled = True
             btnCombine.Text = "🔗 Combine Files"
             Me.UseWaitCursor = False
+        End Try
+    End Sub
+
+    ' New method to clear existing data files (only dataXXX.txt files)
+    Private Sub ClearExistingDataFiles()
+        Try
+            If Directory.Exists(outputFolder) Then
+                ' Get all files in output folder
+                Dim allFiles() As String = Directory.GetFiles(outputFolder, "*.txt", SearchOption.TopDirectoryOnly)
+                Dim deletedCount As Integer = 0
+
+                For Each filePath In allFiles
+                    Dim fileName As String = Path.GetFileNameWithoutExtension(filePath).ToLower()
+
+                    ' Check if filename matches pattern: data + 3 digits (like data001, data002, etc.)
+                    If fileName.Length = 7 AndAlso fileName.StartsWith("data") Then
+                        Dim numberPart As String = fileName.Substring(4) ' Get the last 3 characters
+                        Dim number As Integer
+
+                        ' Check if the last 3 characters are digits
+                        If Integer.TryParse(numberPart, number) AndAlso numberPart.Length = 3 Then
+                            Try
+                                File.Delete(filePath)
+                                deletedCount += 1
+                            Catch
+                                ' Continue even if some files can't be deleted
+                            End Try
+                        End If
+                    End If
+                Next
+
+                If deletedCount > 0 Then
+                    toolStripStatusLabel1.Text = $"Cleared {deletedCount} existing data files (data001.txt, data002.txt, etc.)"
+                End If
+            End If
+        Catch ex As Exception
+            ' Log but don't stop the process
+            toolStripStatusLabel1.Text = "Warning: Could not clear existing data files - " & ex.Message
         End Try
     End Sub
 
@@ -1512,19 +1666,30 @@ Public Class frmMain
         settingsForm.OutputFolderPath = outputFolder
         settingsForm.DatabaseFiles = New List(Of String)(databaseFiles)
         settingsForm.IncludeDatabase = includeDatabase
-        settingsForm.ExcludedFolders = New List(Of String)(excludedFolders) ' Added excluded folders
+        settingsForm.ExcludedFolders = New List(Of String)(excludedFolders)
+
+        ' FIXED: Set extension lists properly
+        settingsForm.VBDesktopExtensions = New List(Of String)(vbDesktopExtensions)
+        settingsForm.AspCoreExtensions = New List(Of String)(aspCoreExtensions)
+        settingsForm.AspMvcExtensions = New List(Of String)(aspMvcExtensions)
 
         If settingsForm.ShowDialog() = DialogResult.OK Then
             projectFolder = settingsForm.ProjectFolderPath
             outputFolder = settingsForm.OutputFolderPath
             databaseFiles = settingsForm.DatabaseFiles
             includeDatabase = settingsForm.IncludeDatabase
-            excludedFolders = settingsForm.ExcludedFolders ' Added excluded folders
+            excludedFolders = settingsForm.ExcludedFolders
 
+            ' FIXED: Get updated extension lists and save them
+            vbDesktopExtensions = settingsForm.VBDesktopExtensions
+            aspCoreExtensions = settingsForm.AspCoreExtensions
+            aspMvcExtensions = settingsForm.AspMvcExtensions
+
+            ' Save all configuration including extensions
             SaveConfiguration()
             LoadProjectFolder()
 
-            toolStripStatusLabel1.Text = $"Settings updated - {databaseFiles.Count} SQL file(s), {excludedFolders.Count} excluded folder(s)"
+            toolStripStatusLabel1.Text = $"Settings updated - {databaseFiles.Count} SQL file(s), {excludedFolders.Count} excluded folder(s), Extensions saved"
         End If
     End Sub
 
@@ -1631,7 +1796,7 @@ Public Class frmMain
                                    $"Configuration files:{vbCrLf}" &
                                    $"• config.ini - Application settings{vbCrLf}" &
                                    $"• template.ini - Saved file templates{vbCrLf}{vbCrLf}" &
-                                   $"© 2024 RepoBundle Project"
+                                   $"© 2025 Samsur Rahman Mahi"
 
         MessageBox.Show(aboutMessage, "About RepoBundle", MessageBoxButtons.OK, MessageBoxIcon.Information)
     End Sub

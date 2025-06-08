@@ -1,15 +1,19 @@
 ﻿Imports System.IO
 Imports System.Text
+Imports System.Text.RegularExpressions
 
 Public Class FileCombiner
     Private projectFolder As String
     Private outputFolder As String
     Private fileDelimiter As String = "==================== FILE: {0} ===================="
 
-    ' File extension lists for different project types
-    Private vbDesktopExtensions As String() = {".vb", ".designer.vb", ".vbproj", ".sql"}
-    Private aspCoreExtensions As String() = {".cs", ".cshtml", ".css", ".js", ".sql"}
-    Private mediaExtensions As String() = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp", ".avif", ".apng",
+    ' Dynamic extension lists (loaded from settings)
+    Private vbDesktopExtensions As List(Of String)
+    Private aspCoreExtensions As List(Of String)
+    Private aspMvcExtensions As List(Of String)
+
+    ' Media extensions that should never be included
+    Private ReadOnly mediaExtensions As String() = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp", ".avif", ".apng",
                                           ".heif", ".heic", ".svg", ".pdf", ".eps", ".ai", ".cdr", ".wmf", ".emf", ".raw",
                                           ".cr2", ".nef", ".orf", ".rw2", ".dng", ".wav", ".aiff", ".au", ".flac", ".alac",
                                           ".ape", ".wv", ".mp3", ".aac", ".m4a", ".ogg", ".opus", ".wma", ".amr", ".mp4",
@@ -19,6 +23,29 @@ Public Class FileCombiner
     Public Sub New(projectFolderPath As String, outputFolderPath As String)
         projectFolder = projectFolderPath
         outputFolder = outputFolderPath
+        LoadExtensionsFromSettings()
+    End Sub
+
+    Private Sub LoadExtensionsFromSettings()
+        ' Load extensions from INI file
+        Dim iniHelper As New IniHelper(Path.Combine(Application.StartupPath, "config.ini"))
+
+        ' Initialize with defaults if not found in config
+        vbDesktopExtensions = New List(Of String)
+        aspCoreExtensions = New List(Of String)
+        aspMvcExtensions = New List(Of String)
+
+        ' Load VB Desktop extensions
+        Dim vbExtString As String = iniHelper.ReadValue("Extensions", "VBDesktop", "*.vb,*.designer.vb,*.vbproj,*.resx,*.config,*.sql")
+        vbDesktopExtensions.AddRange(vbExtString.Split(","c).Select(Function(x) x.Trim()).Where(Function(x) Not String.IsNullOrEmpty(x)))
+
+        ' Load ASP.NET Core extensions with special rules
+        Dim coreExtString As String = iniHelper.ReadValue("Extensions", "AspCore", "*.cs,_*.cshtml,site.css,site.js,*.json,*.sql")
+        aspCoreExtensions.AddRange(coreExtString.Split(","c).Select(Function(x) x.Trim()).Where(Function(x) Not String.IsNullOrEmpty(x)))
+
+        ' Load ASP.NET MVC extensions
+        Dim mvcExtString As String = iniHelper.ReadValue("Extensions", "AspMvc", "*.cs,*.cshtml,*.css,*.js,*.config,*.sql")
+        aspMvcExtensions.AddRange(mvcExtString.Split(","c).Select(Function(x) x.Trim()).Where(Function(x) Not String.IsNullOrEmpty(x)))
     End Sub
 
     Public Function CombineFiles(checkedFiles As List(Of String), projectType As String, treeNodes As TreeNodeCollection, Optional projectTitle As String = "", Optional databasePath As String = "", Optional databaseName As String = "", Optional includeDatabase As Boolean = False, Optional sqlFiles As List(Of String) = Nothing) As CombineResult
@@ -84,11 +111,6 @@ Public Class FileCombiner
                             fileTreeContent.AppendLine("======================================================")
                             fileTreeContent.AppendLine()
                         End Try
-                    Else
-                        fileTreeContent.AppendLine("==================== DATABASE ERROR ====================")
-                        fileTreeContent.AppendLine("Database file not found: " & databasePath)
-                        fileTreeContent.AppendLine("======================================================")
-                        fileTreeContent.AppendLine()
                     End If
                 End If
 
@@ -170,6 +192,122 @@ Public Class FileCombiner
         End Try
     End Function
 
+    Private Function ShouldIncludeFile(filePath As String, projectType As String) As Boolean
+        If Not File.Exists(filePath) Then
+            Return False
+        End If
+
+        Dim extension As String = Path.GetExtension(filePath).ToLower()
+        Dim fileName As String = Path.GetFileName(filePath).ToLower()
+        Dim fileNameWithoutExt As String = Path.GetFileNameWithoutExtension(filePath).ToLower()
+
+        ' Skip media files for all project types
+        If mediaExtensions.Contains(extension) Then
+            Return False
+        End If
+
+        Select Case projectType
+            Case "Visual Basic Desktop"
+                Return ShouldIncludeVBDesktopFile(extension, fileName, fileNameWithoutExt)
+            Case "Asp Dotnet Core 8"
+                Return ShouldIncludeAspCoreFile(extension, fileName, fileNameWithoutExt)
+            Case "Asp MVC 5"
+                Return ShouldIncludeAspMvcFile(extension, fileName, fileNameWithoutExt)
+            Case Else
+                Return False
+        End Select
+    End Function
+
+    Private Function ShouldIncludeVBDesktopFile(extension As String, fileName As String, fileNameWithoutExt As String) As Boolean
+        ' Check against dynamic extension list
+        For Each extPattern In vbDesktopExtensions
+            If extPattern.StartsWith("*") Then
+                ' Wildcard pattern like *.vb
+                Dim extToMatch As String = extPattern.Substring(1).ToLower()
+                If extension = extToMatch Then
+                    Return True
+                End If
+            Else
+                ' Specific file name
+                If fileName = extPattern.ToLower() Then
+                    Return True
+                End If
+            End If
+        Next
+        Return False
+    End Function
+
+    Private Function ShouldIncludeAspCoreFile(extension As String, fileName As String, fileNameWithoutExt As String) As Boolean
+        ' Check against dynamic extension list with regex support
+        For Each extPattern In aspCoreExtensions
+            If IsRegexPattern(extPattern) Then
+                ' Use regex matching
+                Try
+                    Dim regex As New Regex(extPattern, RegexOptions.IgnoreCase)
+                    If regex.IsMatch(fileName) Then
+                        Return True
+                    End If
+                Catch
+                    ' If regex fails, skip this pattern
+                    Continue For
+                End Try
+            ElseIf extPattern.StartsWith("*") Then
+                ' Wildcard pattern like *.css
+                Dim extToMatch As String = extPattern.Substring(1).ToLower()
+                If extension = extToMatch Then
+                    Return True
+                End If
+            Else
+                ' Specific file name like site.css
+                If fileName = extPattern.ToLower() Then
+                    Return True
+                End If
+            End If
+        Next
+        Return False
+    End Function
+
+    Private Function IsRegexPattern(pattern As String) As Boolean
+        ' Check if the pattern contains regex metacharacters
+        Return pattern.Contains("^") OrElse pattern.Contains("$") OrElse
+               pattern.Contains("(") OrElse pattern.Contains(")") OrElse
+               pattern.Contains("[") OrElse pattern.Contains("]") OrElse
+               pattern.Contains("?") OrElse pattern.Contains("+") OrElse
+               (pattern.Contains(".") AndAlso pattern.Contains("\"))
+    End Function
+
+    Private Function ShouldIncludeAspMvcFile(extension As String, fileName As String, fileNameWithoutExt As String) As Boolean
+        ' Check against dynamic extension list
+        For Each extPattern In aspMvcExtensions
+            If extPattern.StartsWith("*") Then
+                ' Wildcard pattern like *.cs
+                Dim extToMatch As String = extPattern.Substring(1).ToLower()
+                If extension = extToMatch Then
+                    Return True
+                End If
+            Else
+                ' Specific file name
+                If fileName = extPattern.ToLower() Then
+                    Return True
+                End If
+            End If
+        Next
+        Return False
+    End Function
+
+    Private Function GetFileContent(filePath As String, projectType As String) As String
+        Try
+            If ShouldIncludeFile(filePath, projectType) Then
+                Return File.ReadAllText(filePath)
+            Else
+                Return ""
+            End If
+        Catch ex As Exception
+            ' If file can't be read, return empty content
+            Return ""
+        End Try
+    End Function
+
     Private Sub GenerateFileTree(nodes As TreeNodeCollection, indent As String, treeContent As StringBuilder)
         For Each node As TreeNode In nodes
             If node.Checked AndAlso node.Tag IsNot Nothing Then
@@ -211,8 +349,6 @@ Public Class FileCombiner
         Return False
     End Function
 
-    ' In your FileCombiner.vb, replace the GetRelativePath method with this fixed version:
-
     Private Function GetRelativePath(fullPath As String, basePath As String) As String
         Try
             ' Use simple string manipulation instead of URI to avoid URL encoding
@@ -235,8 +371,6 @@ Public Class FileCombiner
         End Try
     End Function
 
-
-
     Private Sub SaveCombinedFile(content As String, fileNumber As Integer)
         Try
             Dim fileName As String = $"data{fileNumber:D3}.txt"
@@ -255,85 +389,6 @@ Public Class FileCombiner
             Throw New Exception($"Failed to save file data{fileNumber:D3}.txt: {ex.Message}")
         End Try
     End Sub
-
-    Private Function ShouldIncludeFile(filePath As String, projectType As String) As Boolean
-        If Not File.Exists(filePath) Then
-            Return False
-        End If
-
-        Dim extension As String = Path.GetExtension(filePath).ToLower()
-
-        ' Skip media files for all project types
-        If mediaExtensions.Contains(extension) Then
-            Return False
-        End If
-
-        Select Case projectType
-            Case "Visual Basic Desktop"
-                Return vbDesktopExtensions.Contains(extension)
-            Case "Asp Dotnet Core 8"
-                Return aspCoreExtensions.Contains(extension)
-            Case "Asp MVC 5"
-                Return aspCoreExtensions.Contains(extension)
-            Case Else
-                Return False
-        End Select
-    End Function
-
-    Private Function GetFileContent(filePath As String, projectType As String) As String
-        Try
-            Dim extension As String = Path.GetExtension(filePath).ToLower()
-            Dim fileName As String = Path.GetFileName(filePath).ToLower()
-
-            Select Case projectType
-                Case "Visual Basic Desktop"
-                    ' All VB files and SQL files get full text
-                    If vbDesktopExtensions.Contains(extension) Then
-                        Return File.ReadAllText(filePath)
-                    Else
-                        Return ""
-                    End If
-
-                Case "Asp Dotnet Core 8", "Asp MVC 5"
-                    Select Case extension
-                        Case ".cs"
-                            Return File.ReadAllText(filePath)
-                        Case ".sql"
-                            ' SQL files get full text for all project types
-                            Return File.ReadAllText(filePath)
-                        Case ".cshtml"
-                            ' Only include layout files (files starting with _)
-                            If fileName.StartsWith("_") Then
-                                Return File.ReadAllText(filePath)
-                            Else
-                                Return "" ' Skip non-layout CSHTML files
-                            End If
-                        Case ".css"
-                            ' Only include site.css
-                            If fileName = "site.css" Then
-                                Return File.ReadAllText(filePath)
-                            Else
-                                Return "" ' Skip other CSS files
-                            End If
-                        Case ".js"
-                            ' Only include site.js
-                            If fileName = "site.js" Then
-                                Return File.ReadAllText(filePath)
-                            Else
-                                Return "" ' Skip other JS files
-                            End If
-                        Case Else
-                            Return ""
-                    End Select
-
-                Case Else
-                    Return ""
-            End Select
-        Catch ex As Exception
-            ' If file can't be read, return empty content
-            Return ""
-        End Try
-    End Function
 
     Public Function EstimateTokenCount(checkedFiles As List(Of String), projectType As String) As Integer
         Dim tokenCount As Integer = 0
@@ -358,26 +413,4 @@ Public Class FileCombiner
         ' Simple token estimation: approximately 4 characters per token
         Return Math.Ceiling(text.Length / 4)
     End Function
-End Class
-
-Public Class CombineResult
-    Public Property Success As Boolean
-    Public Property Message As String
-    Public Property FileCount As Integer
-    Public Property ProcessedFiles As Integer
-
-    Public Sub New(success As Boolean, message As String)
-        Me.Success = success
-        Me.Message = message
-        Me.FileCount = 0
-        Me.ProcessedFiles = 0
-    End Sub
-
-    Public Sub New(success As Boolean, message As String, fileCount As Integer, processedFiles As Integer)
-        Me.Success = success
-        Me.Message = message
-        Me.FileCount = fileCount
-        Me.ProcessedFiles = processedFiles
-    End Sub
-
 End Class

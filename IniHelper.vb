@@ -59,9 +59,9 @@ Public Class IniHelper
                     Dim value As String = trimmedLine.Substring(equalIndex + 1).Trim()
 
                     If currentKey.Equals(key, StringComparison.OrdinalIgnoreCase) Then
-                        ' Handle escaped characters
-                        value = value.Replace("\n", vbCrLf)
-                        value = value.Replace("\\", "\")
+                        ' FIXED: Proper unescaping - first handle backslashes, then newlines
+                        value = value.Replace("\\", "\")      ' Unescape backslashes first
+                        value = value.Replace("\n", vbCrLf)   ' Then handle newlines
                         Return value
                     End If
                 End If
@@ -82,9 +82,9 @@ Public Class IniHelper
         Dim sectionStartIndex As Integer = -1
         Dim sectionEndIndex As Integer = -1
 
-        ' Escape special characters in value
-        value = value.Replace("\", "\\")
-        value = value.Replace(vbCrLf, "\n")
+        ' FIXED: Proper escaping - handle newlines first, then backslashes
+        value = value.Replace(vbCrLf, "\n")   ' Escape newlines first
+        value = value.Replace("\", "\\")      ' Then escape backslashes
 
         ' Read existing content if file exists
         If File.Exists(filePath) Then
