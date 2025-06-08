@@ -6,6 +6,9 @@
 
 A powerful Windows Forms application built with VB.NET that intelligently combines project files for AI prompts, documentation, or code reviews. Inspired by tools like [Prompt Engineer](https://prompt.16x.engineer/).
 
+![image](https://github.com/user-attachments/assets/f85efafa-f3fa-4759-96c7-6bcf027dfa72)
+
+
 ## ✨ Features
 
 ### 🎯 Core Functionality
@@ -213,4 +216,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Made with ❤️ by the RepoBundle Community**
+**Made with ❤️ by Samsur Rahman Mahi**
