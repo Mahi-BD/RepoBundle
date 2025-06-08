@@ -156,7 +156,7 @@ Partial Class frmMain
         treeView1.CheckBoxes = True
         treeView1.ContextMenuStrip = contextMenuStrip1
         treeView1.Dock = DockStyle.Fill
-        treeView1.Font = New Font("Segoe UI", 9.0F)
+        treeView1.Font = New Font("Segoe UI", 9F)
         treeView1.FullRowSelect = True
         treeView1.HideSelection = False
         treeView1.Location = New Point(8, 26)
@@ -197,7 +197,7 @@ Partial Class frmMain
         ' 
         btnCollapseAll.BackColor = Color.FromArgb(CByte(255), CByte(193), CByte(7))
         btnCollapseAll.FlatStyle = FlatStyle.Flat
-        btnCollapseAll.Font = New Font("Segoe UI", 9.0F)
+        btnCollapseAll.Font = New Font("Segoe UI", 9F)
         btnCollapseAll.ForeColor = Color.Black
         btnCollapseAll.Location = New Point(148, 7)
         btnCollapseAll.Name = "btnCollapseAll"
@@ -210,7 +210,7 @@ Partial Class frmMain
         ' 
         btnExpandAll.BackColor = Color.FromArgb(CByte(40), CByte(167), CByte(69))
         btnExpandAll.FlatStyle = FlatStyle.Flat
-        btnExpandAll.Font = New Font("Segoe UI", 9.0F)
+        btnExpandAll.Font = New Font("Segoe UI", 9F)
         btnExpandAll.ForeColor = Color.White
         btnExpandAll.Location = New Point(74, 7)
         btnExpandAll.Name = "btnExpandAll"
@@ -223,7 +223,7 @@ Partial Class frmMain
         ' 
         btnRefreshTree.BackColor = Color.FromArgb(CByte(108), CByte(117), CByte(125))
         btnRefreshTree.FlatStyle = FlatStyle.Flat
-        btnRefreshTree.Font = New Font("Segoe UI", 9.0F)
+        btnRefreshTree.Font = New Font("Segoe UI", 9F)
         btnRefreshTree.ForeColor = Color.White
         btnRefreshTree.Location = New Point(0, 7)
         btnRefreshTree.Name = "btnRefreshTree"
@@ -246,13 +246,13 @@ Partial Class frmMain
         ' 
         ' grpCombineActions
         ' 
+        grpCombineActions.Anchor = AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
         grpCombineActions.Controls.Add(pnlCombineControls)
-        grpCombineActions.Dock = DockStyle.Bottom
         grpCombineActions.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
-        grpCombineActions.Location = New Point(4, 518)
+        grpCombineActions.Location = New Point(4, 541)
         grpCombineActions.Name = "grpCombineActions"
         grpCombineActions.Padding = New Padding(8)
-        grpCombineActions.Size = New Size(741, 120)
+        grpCombineActions.Size = New Size(741, 97)
         grpCombineActions.TabIndex = 2
         grpCombineActions.TabStop = False
         grpCombineActions.Text = "Combine Files"
@@ -263,18 +263,18 @@ Partial Class frmMain
         pnlCombineControls.Controls.Add(lblTokenCount)
         pnlCombineControls.Controls.Add(btnCombine)
         pnlCombineControls.Dock = DockStyle.Fill
-        pnlCombineControls.Font = New Font("Segoe UI", 9.0F)
+        pnlCombineControls.Font = New Font("Segoe UI", 9F)
         pnlCombineControls.Location = New Point(8, 26)
         pnlCombineControls.Name = "pnlCombineControls"
-        pnlCombineControls.Size = New Size(725, 86)
+        pnlCombineControls.Size = New Size(725, 63)
         pnlCombineControls.TabIndex = 0
         ' 
         ' progressBar1
         ' 
         progressBar1.Anchor = AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        progressBar1.Location = New Point(8, 57)
+        progressBar1.Location = New Point(224, 31)
         progressBar1.Name = "progressBar1"
-        progressBar1.Size = New Size(704, 20)
+        progressBar1.Size = New Size(490, 20)
         progressBar1.Style = ProgressBarStyle.Continuous
         progressBar1.TabIndex = 5
         progressBar1.Visible = False
@@ -283,9 +283,9 @@ Partial Class frmMain
         ' 
         lblTokenCount.Anchor = AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
         lblTokenCount.AutoSize = True
-        lblTokenCount.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold)
+        lblTokenCount.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
         lblTokenCount.ForeColor = Color.FromArgb(CByte(40), CByte(167), CByte(69))
-        lblTokenCount.Location = New Point(220, 23)
+        lblTokenCount.Location = New Point(219, 8)
         lblTokenCount.Name = "lblTokenCount"
         lblTokenCount.Size = New Size(108, 19)
         lblTokenCount.TabIndex = 4
@@ -295,7 +295,7 @@ Partial Class frmMain
         ' 
         btnCombine.BackColor = Color.FromArgb(CByte(220), CByte(53), CByte(69))
         btnCombine.FlatStyle = FlatStyle.Flat
-        btnCombine.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold)
+        btnCombine.Font = New Font("Segoe UI", 12F, FontStyle.Bold)
         btnCombine.ForeColor = Color.White
         btnCombine.Location = New Point(8, 8)
         btnCombine.Name = "btnCombine"
@@ -306,13 +306,13 @@ Partial Class frmMain
         ' 
         ' grpProjectSettings
         ' 
+        grpProjectSettings.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
         grpProjectSettings.Controls.Add(splitContainer2)
-        grpProjectSettings.Dock = DockStyle.Fill
         grpProjectSettings.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
         grpProjectSettings.Location = New Point(4, 128)
         grpProjectSettings.Name = "grpProjectSettings"
         grpProjectSettings.Padding = New Padding(8)
-        grpProjectSettings.Size = New Size(741, 510)
+        grpProjectSettings.Size = New Size(741, 410)
         grpProjectSettings.TabIndex = 1
         grpProjectSettings.TabStop = False
         grpProjectSettings.Text = "Project Configuration"
@@ -331,8 +331,8 @@ Partial Class frmMain
         ' splitContainer2.Panel2
         ' 
         splitContainer2.Panel2.Controls.Add(pnlProjectBottom)
-        splitContainer2.Size = New Size(725, 476)
-        splitContainer2.SplitterDistance = 240
+        splitContainer2.Size = New Size(725, 376)
+        splitContainer2.SplitterDistance = 189
         splitContainer2.TabIndex = 0
         ' 
         ' pnlProjectTop
@@ -341,14 +341,14 @@ Partial Class frmMain
         pnlProjectTop.Dock = DockStyle.Fill
         pnlProjectTop.Location = New Point(0, 0)
         pnlProjectTop.Name = "pnlProjectTop"
-        pnlProjectTop.Size = New Size(725, 240)
+        pnlProjectTop.Size = New Size(725, 189)
         pnlProjectTop.TabIndex = 0
         ' 
         ' tlpProjectTop
         ' 
         tlpProjectTop.ColumnCount = 2
-        tlpProjectTop.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 130.0F))
-        tlpProjectTop.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100.0F))
+        tlpProjectTop.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 130F))
+        tlpProjectTop.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100F))
         tlpProjectTop.Controls.Add(lblProjectType, 0, 0)
         tlpProjectTop.Controls.Add(cmbProjectType, 1, 0)
         tlpProjectTop.Controls.Add(lblProjectTitle, 0, 1)
@@ -356,14 +356,14 @@ Partial Class frmMain
         tlpProjectTop.Controls.Add(lblProjectInstructions, 0, 2)
         tlpProjectTop.Controls.Add(txtProjectInstructions, 1, 2)
         tlpProjectTop.Dock = DockStyle.Fill
-        tlpProjectTop.Font = New Font("Segoe UI", 9.0F)
+        tlpProjectTop.Font = New Font("Segoe UI", 9F)
         tlpProjectTop.Location = New Point(0, 0)
         tlpProjectTop.Name = "tlpProjectTop"
         tlpProjectTop.RowCount = 3
-        tlpProjectTop.RowStyles.Add(New RowStyle(SizeType.Absolute, 35.0F))
-        tlpProjectTop.RowStyles.Add(New RowStyle(SizeType.Absolute, 35.0F))
-        tlpProjectTop.RowStyles.Add(New RowStyle(SizeType.Percent, 100.0F))
-        tlpProjectTop.Size = New Size(725, 240)
+        tlpProjectTop.RowStyles.Add(New RowStyle(SizeType.Absolute, 35F))
+        tlpProjectTop.RowStyles.Add(New RowStyle(SizeType.Absolute, 35F))
+        tlpProjectTop.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
+        tlpProjectTop.Size = New Size(725, 189)
         tlpProjectTop.TabIndex = 0
         ' 
         ' lblProjectType
@@ -416,12 +416,12 @@ Partial Class frmMain
         ' txtProjectInstructions
         ' 
         txtProjectInstructions.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        txtProjectInstructions.Font = New Font("Consolas", 9.0F)
+        txtProjectInstructions.Font = New Font("Consolas", 9F)
         txtProjectInstructions.Location = New Point(133, 73)
         txtProjectInstructions.Multiline = True
         txtProjectInstructions.Name = "txtProjectInstructions"
         txtProjectInstructions.ScrollBars = ScrollBars.Vertical
-        txtProjectInstructions.Size = New Size(589, 164)
+        txtProjectInstructions.Size = New Size(589, 113)
         txtProjectInstructions.TabIndex = 5
         ' 
         ' pnlProjectBottom
@@ -431,13 +431,13 @@ Partial Class frmMain
         pnlProjectBottom.Dock = DockStyle.Fill
         pnlProjectBottom.Location = New Point(0, 0)
         pnlProjectBottom.Name = "pnlProjectBottom"
-        pnlProjectBottom.Size = New Size(725, 232)
+        pnlProjectBottom.Size = New Size(725, 183)
         pnlProjectBottom.TabIndex = 0
         ' 
         ' lblOtherInstructions
         ' 
         lblOtherInstructions.AutoSize = True
-        lblOtherInstructions.Font = New Font("Segoe UI", 9.0F)
+        lblOtherInstructions.Font = New Font("Segoe UI", 9F)
         lblOtherInstructions.Location = New Point(3, 8)
         lblOtherInstructions.Name = "lblOtherInstructions"
         lblOtherInstructions.Size = New Size(105, 15)
@@ -447,12 +447,12 @@ Partial Class frmMain
         ' txtOtherInstructions
         ' 
         txtOtherInstructions.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        txtOtherInstructions.Font = New Font("Consolas", 9.0F)
+        txtOtherInstructions.Font = New Font("Consolas", 9F)
         txtOtherInstructions.Location = New Point(133, 6)
         txtOtherInstructions.Multiline = True
         txtOtherInstructions.Name = "txtOtherInstructions"
         txtOtherInstructions.ScrollBars = ScrollBars.Vertical
-        txtOtherInstructions.Size = New Size(589, 223)
+        txtOtherInstructions.Size = New Size(589, 174)
         txtOtherInstructions.TabIndex = 7
         ' 
         ' grpTemplateManager
@@ -471,7 +471,7 @@ Partial Class frmMain
         ' tlpTemplateControls
         ' 
         tlpTemplateControls.ColumnCount = 4
-        tlpTemplateControls.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 131.0F))
+        tlpTemplateControls.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 131F))
         tlpTemplateControls.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 76.31579F))
         tlpTemplateControls.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 12.2291021F))
         tlpTemplateControls.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 11.4551086F))
@@ -484,12 +484,12 @@ Partial Class frmMain
         tlpTemplateControls.Controls.Add(btnCopyTemplate, 3, 1)
         tlpTemplateControls.Controls.Add(btnUpdateTemplate, 3, 0)
         tlpTemplateControls.Dock = DockStyle.Fill
-        tlpTemplateControls.Font = New Font("Segoe UI", 9.0F)
+        tlpTemplateControls.Font = New Font("Segoe UI", 9F)
         tlpTemplateControls.Location = New Point(8, 26)
         tlpTemplateControls.Name = "tlpTemplateControls"
         tlpTemplateControls.RowCount = 2
-        tlpTemplateControls.RowStyles.Add(New RowStyle(SizeType.Percent, 50.0F))
-        tlpTemplateControls.RowStyles.Add(New RowStyle(SizeType.Percent, 50.0F))
+        tlpTemplateControls.RowStyles.Add(New RowStyle(SizeType.Percent, 50F))
+        tlpTemplateControls.RowStyles.Add(New RowStyle(SizeType.Percent, 50F))
         tlpTemplateControls.Size = New Size(725, 86)
         tlpTemplateControls.TabIndex = 0
         ' 
@@ -601,47 +601,47 @@ Partial Class frmMain
         ' selectProjectFolderToolStripMenuItem
         ' 
         selectProjectFolderToolStripMenuItem.Name = "selectProjectFolderToolStripMenuItem"
-        selectProjectFolderToolStripMenuItem.Size = New Size(182, 22)
+        selectProjectFolderToolStripMenuItem.Size = New Size(181, 22)
         selectProjectFolderToolStripMenuItem.Text = "Select Project &Folder"
         ' 
         ' toolStripSeparator2
         ' 
         toolStripSeparator2.Name = "toolStripSeparator2"
-        toolStripSeparator2.Size = New Size(179, 6)
+        toolStripSeparator2.Size = New Size(178, 6)
         ' 
         ' backupProjectToolStripMenuItem
         ' 
         backupProjectToolStripMenuItem.Name = "backupProjectToolStripMenuItem"
-        backupProjectToolStripMenuItem.Size = New Size(182, 22)
+        backupProjectToolStripMenuItem.Size = New Size(181, 22)
         backupProjectToolStripMenuItem.Text = "&Backup Project"
         ' 
         ' goToOutputToolStripMenuItem
         ' 
         goToOutputToolStripMenuItem.Name = "goToOutputToolStripMenuItem"
-        goToOutputToolStripMenuItem.Size = New Size(182, 22)
+        goToOutputToolStripMenuItem.Size = New Size(181, 22)
         goToOutputToolStripMenuItem.Text = "&Go to Output"
         ' 
         ' toolStripSeparator3
         ' 
         toolStripSeparator3.Name = "toolStripSeparator3"
-        toolStripSeparator3.Size = New Size(179, 6)
+        toolStripSeparator3.Size = New Size(178, 6)
         ' 
         ' makeShortcutToolStripMenuItem
         ' 
         makeShortcutToolStripMenuItem.Name = "makeShortcutToolStripMenuItem"
-        makeShortcutToolStripMenuItem.Size = New Size(182, 22)
+        makeShortcutToolStripMenuItem.Size = New Size(181, 22)
         makeShortcutToolStripMenuItem.Text = "Make &Shortcut"
         ' 
         ' toolStripSeparator1
         ' 
         toolStripSeparator1.Name = "toolStripSeparator1"
-        toolStripSeparator1.Size = New Size(179, 6)
+        toolStripSeparator1.Size = New Size(178, 6)
         ' 
         ' exitToolStripMenuItem
         ' 
         exitToolStripMenuItem.Name = "exitToolStripMenuItem"
         exitToolStripMenuItem.ShortcutKeys = Keys.Alt Or Keys.F4
-        exitToolStripMenuItem.Size = New Size(182, 22)
+        exitToolStripMenuItem.Size = New Size(181, 22)
         exitToolStripMenuItem.Text = "E&xit"
         ' 
         ' settingsToolStripMenuItem
@@ -654,7 +654,7 @@ Partial Class frmMain
         ' applicationSettingsToolStripMenuItem
         ' 
         applicationSettingsToolStripMenuItem.Name = "applicationSettingsToolStripMenuItem"
-        applicationSettingsToolStripMenuItem.Size = New Size(177, 22)
+        applicationSettingsToolStripMenuItem.Size = New Size(180, 22)
         applicationSettingsToolStripMenuItem.Text = "&Application Settings"
         ' 
         ' helpToolStripMenuItem
@@ -714,14 +714,14 @@ Partial Class frmMain
         ' 
         ' frmMain
         ' 
-        AutoScaleDimensions = New SizeF(7.0F, 15.0F)
+        AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         BackColor = Color.FromArgb(CByte(248), CByte(249), CByte(250))
         ClientSize = New Size(1138, 692)
         Controls.Add(splitContainer1)
         Controls.Add(statusStrip1)
         Controls.Add(menuStrip1)
-        Font = New Font("Segoe UI", 9.0F)
+        Font = New Font("Segoe UI", 9F)
         MainMenuStrip = menuStrip1
         MinimumSize = New Size(1000, 600)
         Name = "frmMain"

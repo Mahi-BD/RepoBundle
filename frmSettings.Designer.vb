@@ -36,12 +36,21 @@ Partial Class frmSettings
         Me.lstDatabaseFiles = New System.Windows.Forms.ListBox()
         Me.lblDatabaseFiles = New System.Windows.Forms.Label()
         Me.chkIncludeDatabase = New System.Windows.Forms.CheckBox()
+        Me.grpExcludeFolders = New System.Windows.Forms.GroupBox()
+        Me.btnResetExcluded = New System.Windows.Forms.Button()
+        Me.btnRemoveExcluded = New System.Windows.Forms.Button()
+        Me.btnAddExcluded = New System.Windows.Forms.Button()
+        Me.txtNewExcludedFolder = New System.Windows.Forms.TextBox()
+        Me.lstExcludedFolders = New System.Windows.Forms.ListBox()
+        Me.lblExcludedFolders = New System.Windows.Forms.Label()
+        Me.lblNewExcludedFolder = New System.Windows.Forms.Label()
         Me.btnOK = New System.Windows.Forms.Button()
         Me.btnCancel = New System.Windows.Forms.Button()
         Me.folderBrowserDialog1 = New System.Windows.Forms.FolderBrowserDialog()
         Me.openFileDialog1 = New System.Windows.Forms.OpenFileDialog()
         Me.grpFolders.SuspendLayout()
         Me.grpDatabase.SuspendLayout()
+        Me.grpExcludeFolders.SuspendLayout()
         Me.SuspendLayout()
 
         ' grpFolders
@@ -102,6 +111,75 @@ Partial Class frmSettings
         Me.btnBrowseOutput.Text = "Browse..."
         Me.btnBrowseOutput.UseVisualStyleBackColor = True
 
+        ' grpExcludeFolders
+        Me.grpExcludeFolders.Controls.Add(Me.btnResetExcluded)
+        Me.grpExcludeFolders.Controls.Add(Me.btnRemoveExcluded)
+        Me.grpExcludeFolders.Controls.Add(Me.btnAddExcluded)
+        Me.grpExcludeFolders.Controls.Add(Me.txtNewExcludedFolder)
+        Me.grpExcludeFolders.Controls.Add(Me.lstExcludedFolders)
+        Me.grpExcludeFolders.Controls.Add(Me.lblExcludedFolders)
+        Me.grpExcludeFolders.Controls.Add(Me.lblNewExcludedFolder)
+        Me.grpExcludeFolders.Location = New System.Drawing.Point(12, 150)
+        Me.grpExcludeFolders.Name = "grpExcludeFolders"
+        Me.grpExcludeFolders.Size = New System.Drawing.Size(560, 180)
+        Me.grpExcludeFolders.TabIndex = 1
+        Me.grpExcludeFolders.TabStop = False
+        Me.grpExcludeFolders.Text = "Excluded Folders (for Backup)"
+
+        ' lblExcludedFolders
+        Me.lblExcludedFolders.AutoSize = True
+        Me.lblExcludedFolders.Location = New System.Drawing.Point(20, 25)
+        Me.lblExcludedFolders.Name = "lblExcludedFolders"
+        Me.lblExcludedFolders.Size = New System.Drawing.Size(180, 17)
+        Me.lblExcludedFolders.TabIndex = 0
+        Me.lblExcludedFolders.Text = "Folders to exclude from backup:"
+
+        ' lstExcludedFolders
+        Me.lstExcludedFolders.FormattingEnabled = True
+        Me.lstExcludedFolders.ItemHeight = 16
+        Me.lstExcludedFolders.Location = New System.Drawing.Point(20, 50)
+        Me.lstExcludedFolders.Name = "lstExcludedFolders"
+        Me.lstExcludedFolders.Size = New System.Drawing.Size(350, 84)
+        Me.lstExcludedFolders.TabIndex = 1
+
+        ' lblNewExcludedFolder
+        Me.lblNewExcludedFolder.AutoSize = True
+        Me.lblNewExcludedFolder.Location = New System.Drawing.Point(20, 145)
+        Me.lblNewExcludedFolder.Name = "lblNewExcludedFolder"
+        Me.lblNewExcludedFolder.Size = New System.Drawing.Size(100, 17)
+        Me.lblNewExcludedFolder.TabIndex = 2
+        Me.lblNewExcludedFolder.Text = "Add new folder:"
+
+        ' txtNewExcludedFolder
+        Me.txtNewExcludedFolder.Location = New System.Drawing.Point(130, 142)
+        Me.txtNewExcludedFolder.Name = "txtNewExcludedFolder"
+        Me.txtNewExcludedFolder.Size = New System.Drawing.Size(240, 22)
+        Me.txtNewExcludedFolder.TabIndex = 3
+
+        ' btnAddExcluded
+        Me.btnAddExcluded.Location = New System.Drawing.Point(380, 50)
+        Me.btnAddExcluded.Name = "btnAddExcluded"
+        Me.btnAddExcluded.Size = New System.Drawing.Size(70, 30)
+        Me.btnAddExcluded.TabIndex = 4
+        Me.btnAddExcluded.Text = "Add"
+        Me.btnAddExcluded.UseVisualStyleBackColor = True
+
+        ' btnRemoveExcluded
+        Me.btnRemoveExcluded.Location = New System.Drawing.Point(380, 90)
+        Me.btnRemoveExcluded.Name = "btnRemoveExcluded"
+        Me.btnRemoveExcluded.Size = New System.Drawing.Size(70, 30)
+        Me.btnRemoveExcluded.TabIndex = 5
+        Me.btnRemoveExcluded.Text = "Remove"
+        Me.btnRemoveExcluded.UseVisualStyleBackColor = True
+
+        ' btnResetExcluded
+        Me.btnResetExcluded.Location = New System.Drawing.Point(380, 130)
+        Me.btnResetExcluded.Name = "btnResetExcluded"
+        Me.btnResetExcluded.Size = New System.Drawing.Size(70, 30)
+        Me.btnResetExcluded.TabIndex = 6
+        Me.btnResetExcluded.Text = "Reset"
+        Me.btnResetExcluded.UseVisualStyleBackColor = True
+
         ' grpDatabase
         Me.grpDatabase.Controls.Add(Me.chkIncludeDatabase)
         Me.grpDatabase.Controls.Add(Me.lblDatabaseFiles)
@@ -109,10 +187,10 @@ Partial Class frmSettings
         Me.grpDatabase.Controls.Add(Me.btnBrowseDatabase)
         Me.grpDatabase.Controls.Add(Me.btnRemoveSelected)
         Me.grpDatabase.Controls.Add(Me.btnClearAll)
-        Me.grpDatabase.Location = New System.Drawing.Point(12, 150)
+        Me.grpDatabase.Location = New System.Drawing.Point(12, 340)
         Me.grpDatabase.Name = "grpDatabase"
-        Me.grpDatabase.Size = New System.Drawing.Size(560, 220)
-        Me.grpDatabase.TabIndex = 1
+        Me.grpDatabase.Size = New System.Drawing.Size(560, 180)
+        Me.grpDatabase.TabIndex = 2
         Me.grpDatabase.TabStop = False
         Me.grpDatabase.Text = "Database Settings"
 
@@ -158,7 +236,7 @@ Partial Class frmSettings
         Me.btnRemoveSelected.UseVisualStyleBackColor = True
 
         ' btnClearAll
-        Me.btnClearAll.Location = New System.Drawing.Point(480, 165)
+        Me.btnClearAll.Location = New System.Drawing.Point(380, 140)
         Me.btnClearAll.Name = "btnClearAll"
         Me.btnClearAll.Size = New System.Drawing.Size(70, 30)
         Me.btnClearAll.TabIndex = 5
@@ -166,19 +244,19 @@ Partial Class frmSettings
         Me.btnClearAll.UseVisualStyleBackColor = True
 
         ' btnOK
-        Me.btnOK.Location = New System.Drawing.Point(400, 390)
+        Me.btnOK.Location = New System.Drawing.Point(400, 540)
         Me.btnOK.Name = "btnOK"
         Me.btnOK.Size = New System.Drawing.Size(80, 30)
-        Me.btnOK.TabIndex = 2
+        Me.btnOK.TabIndex = 3
         Me.btnOK.Text = "OK"
         Me.btnOK.UseVisualStyleBackColor = True
 
         ' btnCancel
         Me.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel
-        Me.btnCancel.Location = New System.Drawing.Point(490, 390)
+        Me.btnCancel.Location = New System.Drawing.Point(490, 540)
         Me.btnCancel.Name = "btnCancel"
         Me.btnCancel.Size = New System.Drawing.Size(80, 30)
-        Me.btnCancel.TabIndex = 3
+        Me.btnCancel.TabIndex = 4
         Me.btnCancel.Text = "Cancel"
         Me.btnCancel.UseVisualStyleBackColor = True
 
@@ -192,10 +270,11 @@ Partial Class frmSettings
         Me.AutoScaleDimensions = New System.Drawing.SizeF(8.0!, 16.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
         Me.CancelButton = Me.btnCancel
-        Me.ClientSize = New System.Drawing.Size(584, 441)
+        Me.ClientSize = New System.Drawing.Size(584, 590)
         Me.Controls.Add(Me.btnCancel)
         Me.Controls.Add(Me.btnOK)
         Me.Controls.Add(Me.grpDatabase)
+        Me.Controls.Add(Me.grpExcludeFolders)
         Me.Controls.Add(Me.grpFolders)
         Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
         Me.MaximizeBox = False
@@ -205,6 +284,8 @@ Partial Class frmSettings
         Me.Text = "Application Settings"
         Me.grpFolders.ResumeLayout(False)
         Me.grpFolders.PerformLayout()
+        Me.grpExcludeFolders.ResumeLayout(False)
+        Me.grpExcludeFolders.PerformLayout()
         Me.grpDatabase.ResumeLayout(False)
         Me.grpDatabase.PerformLayout()
         Me.ResumeLayout(False)
@@ -217,6 +298,16 @@ Partial Class frmSettings
     Friend WithEvents txtOutputFolder As TextBox
     Friend WithEvents lblProjectFolder As Label
     Friend WithEvents lblOutputFolder As Label
+
+    Friend WithEvents grpExcludeFolders As GroupBox
+    Friend WithEvents btnResetExcluded As Button
+    Friend WithEvents btnRemoveExcluded As Button
+    Friend WithEvents btnAddExcluded As Button
+    Friend WithEvents txtNewExcludedFolder As TextBox
+    Friend WithEvents lstExcludedFolders As ListBox
+    Friend WithEvents lblExcludedFolders As Label
+    Friend WithEvents lblNewExcludedFolder As Label
+
     Friend WithEvents grpDatabase As GroupBox
     Friend WithEvents btnClearAll As Button
     Friend WithEvents btnRemoveSelected As Button

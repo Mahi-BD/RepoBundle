@@ -10,6 +10,7 @@ Public Class frmMain
     Private projectFolder As String = ""
     Private outputFolder As String = ""
     Private databaseFiles As New List(Of String)
+    Private excludedFolders As New List(Of String) ' Added for dynamic excluded folders
     Private includeDatabase As Boolean = False
     Private lastSelectedTemplate As String = ""
     Private lastSelectedProjectType As String = ""
@@ -92,6 +93,24 @@ Public Class frmMain
         lastSelectedTemplate = iniHelper.ReadValue("Main", "LastSelectedTemplate", "")
         lastSelectedProjectType = iniHelper.ReadValue("Main", "LastSelectedProjectType", "")
 
+        ' Load excluded folders - FIXED: Added dynamic excluded folders loading
+        Dim excludedFoldersString As String = iniHelper.ReadValue("Backup", "ExcludedFolders", ".git,.vs,.svn,bin,obj")
+        excludedFolders.Clear()
+        If Not String.IsNullOrWhiteSpace(excludedFoldersString) Then
+            Dim folders() As String = excludedFoldersString.Split(New Char() {","c, ";"c}, StringSplitOptions.RemoveEmptyEntries)
+            For Each folder In folders
+                Dim trimmedFolder As String = folder.Trim()
+                If Not String.IsNullOrWhiteSpace(trimmedFolder) Then
+                    excludedFolders.Add(trimmedFolder)
+                End If
+            Next
+        End If
+
+        ' Ensure we have some excluded folders (but not too restrictive)
+        If excludedFolders.Count = 0 Then
+            excludedFolders.AddRange({".git", ".vs", ".svn", "bin", "obj"})
+        End If
+
         ' Load project information
         projectTitle = iniHelper.ReadValue("Project", "Title", "")
         projectInstructions = iniHelper.ReadValue("Project", "Instructions", "").Replace("\n", vbCrLf)
@@ -132,6 +151,9 @@ Public Class frmMain
             iniHelper.WriteValue("Main", "IncludeDatabase", includeDatabase.ToString())
             iniHelper.WriteValue("Main", "LastSelectedTemplate", If(cmbTemplate.SelectedItem?.ToString(), ""))
             iniHelper.WriteValue("Main", "LastSelectedProjectType", If(cmbProjectType.SelectedItem?.ToString(), ""))
+
+            ' FIXED: Save excluded folders
+            iniHelper.WriteValue("Backup", "ExcludedFolders", String.Join(",", excludedFolders))
 
             ' Save project information
             iniHelper.WriteValue("Project", "Title", txtProjectTitle.Text.Trim())
@@ -406,6 +428,7 @@ Public Class frmMain
         End If
     End Sub
 
+    ' === BACKUP FUNCTIONALITY - FIXED VERSION ===
     Private Sub backupProjectToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles backupProjectToolStripMenuItem.Click
         If String.IsNullOrEmpty(projectFolder) Then
             MessageBox.Show("Please select a project folder first.", "Project Folder Required", MessageBoxButtons.OK, MessageBoxIcon.Warning)
@@ -430,28 +453,40 @@ Public Class frmMain
 
             ' Generate backup filename
             Dim projectName As String = If(String.IsNullOrWhiteSpace(txtProjectTitle.Text), Path.GetFileName(projectFolder), txtProjectTitle.Text.Trim())
+            ' Clean project name for filename
+            For Each invalidChar In Path.GetInvalidFileNameChars()
+                projectName = projectName.Replace(invalidChar, "_")
+            Next
+
             Dim timestamp As String = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss")
             Dim zipFileName As String = $"{projectName}_{timestamp}.zip"
             Dim zipFilePath As String = Path.Combine(outputFolder, zipFileName)
 
             ' Show progress
             ShowProgress()
-            btnCombine.Enabled = False ' Disable other operations during backup
+            btnCombine.Enabled = False
 
             Try
                 ' Create backup with progress
                 CreateProjectBackup(projectFolder, zipFilePath)
 
-                UpdateProgress(100, "Backup completed successfully!")
-                System.Threading.Thread.Sleep(1000)
+                ' Verify backup was created successfully
+                If File.Exists(zipFilePath) Then
+                    Dim fileInfo As New FileInfo(zipFilePath)
+                    If fileInfo.Length > 0 Then
+                        toolStripStatusLabel1.Text = $"Project backed up successfully: {zipFileName} ({FormatFileSize(fileInfo.Length)})"
 
-                toolStripStatusLabel1.Text = $"Project backed up to: {zipFileName}"
-
-                ' Ask if user wants to open output folder
-                Dim result As DialogResult = MessageBox.Show($"Backup created successfully:{vbCrLf}{zipFilePath}{vbCrLf}{vbCrLf}Would you like to open the output folder?",
-                                                           "Backup Complete", MessageBoxButtons.YesNo, MessageBoxIcon.Information)
-                If result = DialogResult.Yes Then
-                    goToOutputToolStripMenuItem_Click(sender, e)
+                        ' Ask if user wants to open output folder
+                        Dim result As DialogResult = MessageBox.Show($"Backup created successfully:{vbCrLf}{zipFilePath}{vbCrLf}Size: {FormatFileSize(fileInfo.Length)}{vbCrLf}{vbCrLf}Would you like to open the output folder?",
+                                                                   "Backup Complete", MessageBoxButtons.YesNo, MessageBoxIcon.Information)
+                        If result = DialogResult.Yes Then
+                            goToOutputToolStripMenuItem_Click(sender, e)
+                        End If
+                    Else
+                        MessageBox.Show("Backup file was created but is empty. No files were found to backup.", "Backup Empty", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    End If
+                Else
+                    MessageBox.Show("Backup file was not created.", "Backup Failed", MessageBoxButtons.OK, MessageBoxIcon.Error)
                 End If
 
             Finally
@@ -465,6 +500,7 @@ Public Class frmMain
         End Try
     End Sub
 
+    ' Main backup creation method
     Private Sub CreateProjectBackup(sourceFolder As String, zipFilePath As String)
         UpdateProgress(5, "Initializing backup process...")
 
@@ -475,102 +511,200 @@ Public Class frmMain
 
         UpdateProgress(10, "Scanning project files...")
 
-        ' Get all files and folders to backup (excluding specified folders)
-        Dim excludedFolders As String() = {".git", ".vs", ".svn", "repobundle", "Resource"}
+        ' Get all files to backup using simple method
         Dim filesToBackup As New List(Of String)
-        Dim foldersToCreate As New List(Of String)
 
-        ' Recursively scan directory
-        ScanDirectoryForBackup(sourceFolder, sourceFolder, filesToBackup, foldersToCreate, excludedFolders)
+        Try
+            ' Simple scan - get all files and then filter
+            Dim allFiles() As String = Directory.GetFiles(sourceFolder, "*.*", SearchOption.AllDirectories)
 
-        UpdateProgress(20, $"Found {filesToBackup.Count} files to backup...")
-
-        ' Create zip file using System.IO.Compression
-        Using archive As System.IO.Compression.ZipArchive = System.IO.Compression.ZipFile.Open(zipFilePath, System.IO.Compression.ZipArchiveMode.Create)
-
-            ' Add folders first
-            UpdateProgress(30, "Creating folder structure...")
-            For Each folder In foldersToCreate
-                Dim relativePath As String = GetRelativePath(folder, sourceFolder).Replace("\", "/")
-                If Not String.IsNullOrEmpty(relativePath) Then
-                    archive.CreateEntry(relativePath & "/")
+            For Each filePath In allFiles
+                If ShouldIncludeFileInBackup(filePath, sourceFolder) Then
+                    filesToBackup.Add(filePath)
                 End If
             Next
 
-            ' Add files with progress
+        Catch ex As Exception
+            Throw New Exception($"Error scanning project folder: {ex.Message}")
+        End Try
+
+        UpdateProgress(20, $"Found {filesToBackup.Count} files to backup...")
+
+        If filesToBackup.Count = 0 Then
+            ' Try to get a file count for debugging
+            Dim totalFiles As Integer = 0
+            Try
+                totalFiles = Directory.GetFiles(sourceFolder, "*.*", SearchOption.AllDirectories).Length
+            Catch
+            End Try
+
+            Throw New Exception($"No files found to backup.{vbCrLf}{vbCrLf}" &
+                              $"Project folder: {sourceFolder}{vbCrLf}" &
+                              $"Total files in folder: {totalFiles}{vbCrLf}" &
+                              $"Excluded folders: {String.Join(", ", excludedFolders)}{vbCrLf}{vbCrLf}" &
+                              $"Try adjusting excluded folders in Settings.")
+        End If
+
+        ' Create zip file
+        Using archive As ZipArchive = ZipFile.Open(zipFilePath, ZipArchiveMode.Create)
             Dim totalFiles As Integer = filesToBackup.Count
+
             For i As Integer = 0 To totalFiles - 1
                 Dim filePath As String = filesToBackup(i)
                 Dim fileName As String = Path.GetFileName(filePath)
-                Dim progress As Integer = 30 + CInt((i + 1) * 60 / totalFiles) ' 30% to 90%
+                Dim progress As Integer = 20 + CInt((i + 1) * 70 / totalFiles)
 
-                UpdateProgress(progress, $"Backing up file {i + 1}/{totalFiles}: {fileName}")
+                UpdateProgress(progress, $"Backing up {i + 1}/{totalFiles}: {fileName}")
 
                 Try
-                    Dim relativePath As String = GetRelativePath(filePath, sourceFolder).Replace("\", "/")
-                    Dim entry As System.IO.Compression.ZipArchiveEntry = archive.CreateEntry(relativePath)
+                    ' Calculate relative path
+                    Dim relativePath As String = GetBackupRelativePath(filePath, sourceFolder)
 
+                    If String.IsNullOrEmpty(relativePath) Then
+                        Continue For
+                    End If
+
+                    ' Normalize path separators for zip file
+                    relativePath = relativePath.Replace("\", "/")
+
+                    ' Create zip entry
+                    Dim entry As ZipArchiveEntry = archive.CreateEntry(relativePath, CompressionLevel.Optimal)
+                    entry.LastWriteTime = File.GetLastWriteTime(filePath)
+
+                    ' Copy file content
                     Using entryStream As Stream = entry.Open()
-                        Using fileStream As Stream = File.OpenRead(filePath)
+                        Using fileStream As FileStream = File.OpenRead(filePath)
                             fileStream.CopyTo(entryStream)
                         End Using
                     End Using
+
                 Catch ex As Exception
-                    ' Skip files that can't be read (locked files, etc.)
+                    ' Skip files that can't be read
                     Continue For
                 End Try
 
-                ' Update UI every 10 files or for large file counts
-                If i Mod 10 = 0 OrElse totalFiles < 50 Then
+                ' Update UI periodically
+                If i Mod 10 = 0 Then
                     Application.DoEvents()
                 End If
             Next
         End Using
 
         UpdateProgress(95, "Finalizing backup...")
+
+        ' Verify the backup
+        If File.Exists(zipFilePath) Then
+            Dim fileInfo As New FileInfo(zipFilePath)
+            If fileInfo.Length = 0 Then
+                Throw New Exception("Backup file was created but is empty")
+            End If
+            UpdateProgress(100, $"Backup completed: {FormatFileSize(fileInfo.Length)}")
+        Else
+            Throw New Exception("Backup file was not created")
+        End If
     End Sub
 
-    Private Sub ScanDirectoryForBackup(currentPath As String, rootPath As String, filesToBackup As List(Of String), foldersToCreate As List(Of String), excludedFolders As String())
+    ' Check if a file should be included in backup
+    Private Function ShouldIncludeFileInBackup(filePath As String, rootPath As String) As Boolean
         Try
-            Dim dirName As String = Path.GetFileName(currentPath).ToLower()
+            ' Get file info
+            Dim fileInfo As New FileInfo(filePath)
 
-            ' Skip excluded folders
-            If excludedFolders.Contains(dirName) Then
-                Return
+            ' Skip hidden and system files
+            If fileInfo.Attributes.HasFlag(FileAttributes.Hidden) OrElse fileInfo.Attributes.HasFlag(FileAttributes.System) Then
+                Return False
             End If
 
-            ' Add current directory to folders list (except root)
-            If Not String.Equals(currentPath, rootPath, StringComparison.OrdinalIgnoreCase) Then
-                foldersToCreate.Add(currentPath)
-            End If
+            ' Check if file is in an excluded folder
+            Dim relativePath As String = GetBackupRelativePath(filePath, rootPath)
+            Dim pathParts() As String = relativePath.Split("\"c, "/"c)
 
-            ' Add all files in current directory
-            Dim files() As String = Directory.GetFiles(currentPath)
-            filesToBackup.AddRange(files)
-
-            ' Recursively scan subdirectories
-            Dim subdirectories() As String = Directory.GetDirectories(currentPath)
-            For Each subdirectory In subdirectories
-                ScanDirectoryForBackup(subdirectory, rootPath, filesToBackup, foldersToCreate, excludedFolders)
+            ' Check each part of the path against excluded folders
+            For Each part In pathParts
+                If excludedFolders.Any(Function(excluded) String.Equals(excluded, part, StringComparison.OrdinalIgnoreCase)) Then
+                    Return False
+                End If
             Next
 
-        Catch ex As UnauthorizedAccessException
-            ' Skip directories we don't have permission to access
-        Catch ex As Exception
-            ' Skip other errors and continue
-        End Try
-    End Sub
+            Return True
 
-    Private Function GetRelativePath(fullPath As String, basePath As String) As String
-        Try
-            Dim uri1 As New Uri(basePath & "\")
-            Dim uri2 As New Uri(fullPath)
-            Return uri1.MakeRelativeUri(uri2).ToString().Replace("/", "\")
         Catch
-            ' If URI creation fails, return filename only
+            Return False
+        End Try
+    End Function
+
+    ' Get relative path for backup
+    Private Function GetBackupRelativePath(fullPath As String, basePath As String) As String
+        Try
+            ' Normalize paths to use consistent separators
+            Dim normalizedBase As String = Path.GetFullPath(basePath).TrimEnd(Path.DirectorySeparatorChar)
+            Dim normalizedFull As String = Path.GetFullPath(fullPath)
+
+            ' Check if the file is actually under the base path
+            If normalizedFull.StartsWith(normalizedBase & Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) Then
+                ' Calculate relative path by removing the base path
+                Dim relativePath As String = normalizedFull.Substring(normalizedBase.Length + 1)
+                Return relativePath
+            Else
+                ' File is not under base path, return just filename
+                Return Path.GetFileName(fullPath)
+            End If
+
+        Catch ex As Exception
+            ' Fallback to filename only
             Return Path.GetFileName(fullPath)
         End Try
     End Function
+
+
+    ' Debug method to test backup scanning
+    Private Sub TestBackupScanning()
+        If String.IsNullOrEmpty(projectFolder) OrElse Not Directory.Exists(projectFolder) Then
+            MessageBox.Show("Please select a valid project folder first.", "Test Error", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            Return
+        End If
+
+        Try
+            ' Show current settings
+            Dim excludedList As String = String.Join(", ", excludedFolders)
+
+            ' Count total files
+            Dim allFiles() As String = Directory.GetFiles(projectFolder, "*.*", SearchOption.AllDirectories)
+
+            ' Count files that would be included
+            Dim filesToBackup As New List(Of String)
+            For Each filePath In allFiles
+                If ShouldIncludeFileInBackup(filePath, projectFolder) Then
+                    filesToBackup.Add(filePath)
+                End If
+            Next
+
+            ' Show results
+            Dim message As String = $"Backup Scan Test Results:{vbCrLf}{vbCrLf}" &
+                                   $"Project folder: {projectFolder}{vbCrLf}" &
+                                   $"Excluded folders: {excludedList}{vbCrLf}{vbCrLf}" &
+                                   $"Total files in project: {allFiles.Length}{vbCrLf}" &
+                                   $"Files that would be backed up: {filesToBackup.Count}{vbCrLf}{vbCrLf}"
+
+            If filesToBackup.Count > 0 Then
+                message += "Sample files to backup:"
+                For i As Integer = 0 To Math.Min(9, filesToBackup.Count - 1)
+                    message += $"{vbCrLf}  {Path.GetFileName(filesToBackup(i))}"
+                Next
+                If filesToBackup.Count > 10 Then
+                    message += $"{vbCrLf}  ... and {filesToBackup.Count - 10} more files"
+                End If
+            Else
+                message += "❌ NO FILES WOULD BE BACKED UP!{vbCrLf}{vbCrLf}Check your excluded folders in Settings."
+            End If
+
+            MessageBox.Show(message, "Backup Test Results", MessageBoxButtons.OK,
+                          If(filesToBackup.Count > 0, MessageBoxIcon.Information, MessageBoxIcon.Warning))
+
+        Catch ex As Exception
+            MessageBox.Show($"Error during backup test: {ex.Message}", "Test Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
 
     Private Sub goToOutputToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles goToOutputToolStripMenuItem.Click
         If String.IsNullOrEmpty(outputFolder) Then
@@ -1196,6 +1330,17 @@ Public Class frmMain
         Next
     End Sub
 
+    Private Sub DeleteTemplate(templateName As String)
+        Try
+            Dim sectionName As String = "Template_" & templateName.Replace(" ", "_")
+            If templateIni.SectionExists(sectionName) Then
+                templateIni.DeleteSection(sectionName)
+            End If
+        Catch ex As Exception
+            Throw New Exception("Error deleting template: " & ex.Message)
+        End Try
+    End Sub
+
     ' === COMBINE FILES WITH ENHANCED PROGRESS ===
     Private Sub btnCombine_Click(sender As Object, e As EventArgs) Handles btnCombine.Click
         If String.IsNullOrWhiteSpace(projectFolder) Then
@@ -1360,24 +1505,26 @@ Public Class frmMain
         End If
     End Sub
 
-    ' === SETTINGS ===
+    ' === SETTINGS - FIXED: Updated to include excluded folders ===
     Private Sub applicationSettingsToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles applicationSettingsToolStripMenuItem.Click
         Dim settingsForm As New frmSettings()
         settingsForm.ProjectFolderPath = projectFolder
         settingsForm.OutputFolderPath = outputFolder
         settingsForm.DatabaseFiles = New List(Of String)(databaseFiles)
         settingsForm.IncludeDatabase = includeDatabase
+        settingsForm.ExcludedFolders = New List(Of String)(excludedFolders) ' Added excluded folders
 
         If settingsForm.ShowDialog() = DialogResult.OK Then
             projectFolder = settingsForm.ProjectFolderPath
             outputFolder = settingsForm.OutputFolderPath
             databaseFiles = settingsForm.DatabaseFiles
             includeDatabase = settingsForm.IncludeDatabase
+            excludedFolders = settingsForm.ExcludedFolders ' Added excluded folders
 
             SaveConfiguration()
             LoadProjectFolder()
 
-            toolStripStatusLabel1.Text = $"Settings updated successfully - {databaseFiles.Count} SQL file(s) configured"
+            toolStripStatusLabel1.Text = $"Settings updated - {databaseFiles.Count} SQL file(s), {excludedFolders.Count} excluded folder(s)"
         End If
     End Sub
 
@@ -1414,285 +1561,6 @@ Public Class frmMain
         toolStripProgressBar1.Visible = True
         toolStripProgressBar1.Value = 0
         Application.DoEvents()
-    End Sub
-
-    Private Function CombineFilesWithProgress(combiner As FileCombiner, checkedFiles As List(Of String), allSqlFiles As List(Of String)) As CombineResult
-        ' Filter files that will actually be processed
-        Dim filesToProcess As New List(Of String)
-        For Each filePath In checkedFiles
-            If File.Exists(filePath) Then
-                filesToProcess.Add(filePath)
-            End If
-        Next
-
-        ' Process files with progress updates
-        Dim processedCount As Integer = 0
-        Dim totalFiles As Integer = filesToProcess.Count
-
-        ' Create a progress callback
-        Dim progressStep As Double = 75.0 / Math.Max(totalFiles, 1) ' 75% of progress for file processing (15% to 90%)
-        Dim baseProgress As Integer = 15
-
-        ' Simulate file processing progress by updating during the combine operation
-        For i As Integer = 0 To totalFiles - 1
-            Dim currentProgress As Integer = baseProgress + CInt(i * progressStep)
-            Dim fileName As String = Path.GetFileName(filesToProcess(i))
-            UpdateProgress(currentProgress, $"Processing {i + 1}/{totalFiles}: {fileName}")
-            Application.DoEvents()
-
-            ' Small delay to make progress visible
-            System.Threading.Thread.Sleep(25)
-        Next
-
-        ' Now perform the actual file combination
-        UpdateProgress(85, "Combining all files...")
-        Application.DoEvents()
-
-        Return combiner.CombineFiles(
-            checkedFiles,
-            cmbProjectType.SelectedItem.ToString(),
-            treeView1.Nodes,
-            txtProjectTitle.Text.Trim(),
-            "",
-            "",
-            allSqlFiles.Count > 0,
-            allSqlFiles
-        )
-    End Function
-
-    ' === ENHANCED TEMPLATE LOADING WITH PROGRESS ===
-    Private Sub LoadTemplateWithProgress(templateName As String)
-        If String.IsNullOrEmpty(projectFolder) OrElse Not Directory.Exists(projectFolder) Then
-            If Not isLoadingTemplate Then
-                toolStripStatusLabel1.Text = "Error: Project folder not found - please select project folder first"
-            End If
-            Return
-        End If
-
-        ' Ensure tree is loaded
-        If treeView1.Nodes.Count = 0 Then
-            LoadProjectFolder()
-        End If
-
-        Try
-            ' Step 1: Clear current selection (50%)
-            UpdateProgress(50, "Clearing current selections...")
-            Application.DoEvents()
-            ClearAllChecks(treeView1.Nodes)
-
-            ' Step 2: Read template file (60%)
-            UpdateProgress(60, "Reading template file...")
-            Application.DoEvents()
-
-            Dim sectionName As String = "Template_" & templateName.Replace(" ", "_")
-            Dim keys As List(Of String) = templateIni.GetKeys(sectionName)
-            Dim filesLoaded As Integer = 0
-            Dim filesNotFound As Integer = 0
-            Dim filesToLoad As New List(Of String)
-
-            ' Step 3: Parse template sections (65%)
-            UpdateProgress(65, "Parsing template sections...")
-            Application.DoEvents()
-
-            ' Collect all files from the template
-            For Each key In keys
-                If key.StartsWith("File") Then
-                    Dim filePath As String = templateIni.ReadValue(sectionName, key, "")
-                    If Not String.IsNullOrEmpty(filePath) Then
-                        filesToLoad.Add(filePath)
-                    End If
-                End If
-            Next
-
-            ' Step 4: Process files with progress (70% - 90%)
-            UpdateProgress(70, "Preparing to load " & filesToLoad.Count & " files...")
-            Application.DoEvents()
-
-            Dim progressStep As Double = 20.0 / Math.Max(filesToLoad.Count, 1) ' 20% range for file processing
-            Dim fileIndex As Integer = 0
-
-            For Each filePath In filesToLoad
-                fileIndex += 1
-                Dim currentProgress As Integer = 70 + CInt(fileIndex * progressStep)
-                Dim fileName As String = Path.GetFileName(filePath)
-                UpdateProgress(currentProgress, $"Loading file {fileIndex}/{filesToLoad.Count}: {fileName}")
-                Application.DoEvents()
-
-                If File.Exists(filePath) OrElse Directory.Exists(filePath) Then
-                    ' Check if file is within project folder
-                    If filePath.StartsWith(projectFolder, StringComparison.OrdinalIgnoreCase) Then
-                        SelectFileInTree(filePath)
-                        Dim node As TreeNode = FindNodeByPath(treeView1.Nodes, filePath)
-                        If node IsNot Nothing AndAlso node.Checked Then
-                            filesLoaded += 1
-                        Else
-                            filesNotFound += 1
-                        End If
-                    Else
-                        filesNotFound += 1
-                    End If
-                Else
-                    filesNotFound += 1
-                End If
-
-                ' Small delay to show progress
-                System.Threading.Thread.Sleep(10)
-            Next
-
-            UpdateTokenCount()
-
-            ' Show status message
-            If Not isLoadingTemplate Then
-                If filesLoaded > 0 Then
-                    If filesNotFound > 0 Then
-                        toolStripStatusLabel1.Text = $"Template '{templateName}' loaded: {filesLoaded} files found, {filesNotFound} missing"
-                    Else
-                        toolStripStatusLabel1.Text = $"Template '{templateName}' loaded successfully: {filesLoaded} files selected"
-                    End If
-                Else
-                    toolStripStatusLabel1.Text = $"Template '{templateName}' loaded but no files found in project"
-                End If
-            End If
-
-        Catch ex As Exception
-            If Not isLoadingTemplate Then
-                toolStripStatusLabel1.Text = $"Error loading template '{templateName}': {ex.Message}"
-            End If
-        End Try
-    End Sub
-
-    ' === ENHANCED TEMPLATE UPDATE WITH PROGRESS ===
-    ' === ENHANCED TEMPLATE OPERATIONS ===
-    Private Sub UpdateTemplateWithProgress()
-        If cmbTemplate.SelectedItem Is Nothing Then
-            toolStripStatusLabel1.Text = "Error: Please select a template to update"
-            Return
-        End If
-
-        Dim checkedFiles As List(Of String) = GetCheckedFiles()
-        If checkedFiles.Count = 0 Then
-            toolStripStatusLabel1.Text = "Error: Please select at least one file before updating template"
-            Return
-        End If
-
-        ' Show progress and disable controls
-        ShowProgress()
-        btnUpdateTemplate.Enabled = False
-        btnUpdateTemplate.Text = "Updating..."
-
-        Try
-            Dim templateName As String = cmbTemplate.SelectedItem.ToString()
-
-            ' Step 1: Initialize (10%)
-            UpdateProgress(10, "Initializing template update...")
-
-            ' Step 2: Store tree expansion state (20%)
-            UpdateProgress(20, "Storing tree expansion state...")
-            Dim treeState As Dictionary(Of String, Boolean) = GetTreeExpansionState()
-
-            ' Step 3: Delete old template (40%)
-            UpdateProgress(40, "Removing old template version...")
-            DeleteTemplate(templateName)
-
-            ' Step 4: Save new template (60%)
-            UpdateProgress(60, "Saving updated template...")
-            SaveCurrentTemplate(templateName)
-
-            ' Step 5: Refresh template list (80%)
-            UpdateProgress(80, "Refreshing template list...")
-            LoadTemplates()
-
-            ' Step 6: Restore tree state (90%)
-            UpdateProgress(90, "Restoring tree expansion state...")
-            RestoreTreeExpansionState(treeState)
-
-            ' Step 7: Complete (100%)
-            UpdateProgress(100, "Template update complete!")
-            System.Threading.Thread.Sleep(500)
-
-            toolStripStatusLabel1.Text = "Template '" & templateName & "' updated with " & checkedFiles.Count & " files"
-
-        Catch ex As Exception
-            toolStripStatusLabel1.Text = "Error updating template: " & ex.Message
-        Finally
-            ' Hide progress and restore controls
-            HideProgress()
-            btnUpdateTemplate.Enabled = True
-            btnUpdateTemplate.Text = "Update"
-        End Try
-    End Sub
-
-    Private Sub LoadTemplateWithProgressDialog()
-        If cmbTemplate.SelectedItem Is Nothing Then
-            toolStripStatusLabel1.Text = "Error: Please select a template to load"
-            Return
-        End If
-
-        ' Ensure we have a project folder and tree loaded
-        If String.IsNullOrEmpty(projectFolder) Then
-            toolStripStatusLabel1.Text = "Error: Please select a project folder first using File > Select Project Folder"
-            Return
-        End If
-
-        ' Show progress and disable controls
-        ShowProgress()
-        btnLoadTemplate.Enabled = False
-        btnLoadTemplate.Text = "Loading..."
-
-        Try
-            ' Step 1: Initialize (10%)
-            UpdateProgress(10, "Initializing template loading...")
-
-            ' Step 2: Ensure tree is loaded (20%)
-            UpdateProgress(20, "Ensuring tree is loaded...")
-            EnsureTreeLoaded()
-
-            ' Step 3: Start loading template (30%)
-            UpdateProgress(30, "Reading template file...")
-
-            Dim selectedTemplate = cmbTemplate.SelectedItem.ToString
-
-            ' Step 4: Clear current selections (40%)
-            UpdateProgress(40, "Clearing current selections...")
-
-            ' Step 5: Load template with progress (40% - 90%)
-            UpdateProgress(50, "Loading template: " & selectedTemplate)
-
-            ' Set flag to show detailed status for manual loading
-            isLoadingTemplate = False
-            LoadTemplateWithProgress(selectedTemplate)
-
-            ' Step 6: Finalizing (95%)
-            UpdateProgress(95, "Finalizing template load...")
-
-            ' Count loaded files
-            Dim loadedFiles = GetCheckedFiles()
-
-            ' Step 7: Complete (100%)
-            UpdateProgress(100, "Template loaded successfully!")
-            System.Threading.Thread.Sleep(300)
-
-            toolStripStatusLabel1.Text = "Template '" & selectedTemplate & "' loaded manually - " & loadedFiles.Count & " files selected"
-
-        Catch ex As Exception
-            toolStripStatusLabel1.Text = "Error loading template: " & ex.Message
-        Finally
-            ' Hide progress and restore controls
-            HideProgress()
-            btnLoadTemplate.Enabled = True
-            btnLoadTemplate.Text = "Load"
-        End Try
-    End Sub
-
-    Private Sub DeleteTemplate(templateName As String)
-        Try
-            Dim sectionName As String = "Template_" & templateName.Replace(" ", "_")
-            If templateIni.SectionExists(sectionName) Then
-                templateIni.DeleteSection(sectionName)
-            End If
-        Catch ex As Exception
-            Throw New Exception("Error deleting template: " & ex.Message)
-        End Try
     End Sub
 
     ' === FILE STATUS AND COUNTING ===
@@ -1758,6 +1626,7 @@ Public Class frmMain
                                    $"• Token counting and estimation{vbCrLf}" &
                                    $"• INI-based configuration{vbCrLf}" &
                                    $"• Project backup functionality{vbCrLf}" &
+                                   $"• Dynamic excluded folders{vbCrLf}" &
                                    $"• Quick output folder access{vbCrLf}{vbCrLf}" &
                                    $"Configuration files:{vbCrLf}" &
                                    $"• config.ini - Application settings{vbCrLf}" &
@@ -1841,8 +1710,6 @@ Public Class frmMain
         toolTip.SetToolTip(btnCombine, "Combine selected files (Ctrl+Enter)")
         toolTip.SetToolTip(cmbProjectType, "Select project type for file filtering")
         toolTip.SetToolTip(lblTokenCount, "Estimated token count for selected files")
-
-        ' Note: Menu item tooltips are handled by the menu system itself
     End Sub
 
     ' === WINDOW STATE MANAGEMENT ===
@@ -1924,6 +1791,72 @@ Public Class frmMain
             UpdateFileStatusDisplay()
             lastResize = DateTime.Now
         End If
+    End Sub
+    ' FIXED: Get relative path for general use without URL encoding
+    Private Function GetRelativePath(fullPath As String, basePath As String) As String
+        Try
+            ' Normalize paths to use consistent separators
+            Dim normalizedBase As String = Path.GetFullPath(basePath).TrimEnd(Path.DirectorySeparatorChar)
+            Dim normalizedFull As String = Path.GetFullPath(fullPath)
+
+            ' Check if the file is actually under the base path
+            If normalizedFull.StartsWith(normalizedBase & Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) Then
+                ' Calculate relative path by removing the base path
+                Dim relativePath As String = normalizedFull.Substring(normalizedBase.Length + 1)
+                Return relativePath
+            Else
+                ' File is not under base path, return just filename
+                Return Path.GetFileName(fullPath)
+            End If
+
+        Catch ex As Exception
+            ' Fallback to filename only
+            Return Path.GetFileName(fullPath)
+        End Try
+    End Function
+
+    ' FIXED: Generate file tree method in FileCombiner (if you're using it there too)
+    ' You may need to update the FileCombiner.vb as well with this method:
+    Private Function GetRelativePathForTree(fullPath As String, basePath As String) As String
+        Try
+            ' Simple string-based relative path calculation
+            Dim normalizedBase As String = Path.GetFullPath(basePath).TrimEnd("\"c) & "\"
+            Dim normalizedFull As String = Path.GetFullPath(fullPath)
+
+            If normalizedFull.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase) Then
+                Return normalizedFull.Substring(normalizedBase.Length)
+            Else
+                Return Path.GetFileName(fullPath)
+            End If
+        Catch
+            Return Path.GetFileName(fullPath)
+        End Try
+    End Function
+
+    ' === DEBUG AND TESTING METHODS ===
+    Private Sub TestBackupContents(zipFilePath As String)
+        Try
+            Using archive As ZipArchive = ZipFile.OpenRead(zipFilePath)
+                Dim sb As New System.Text.StringBuilder()
+                sb.AppendLine($"Backup file: {Path.GetFileName(zipFilePath)}")
+                sb.AppendLine($"Total entries: {archive.Entries.Count}")
+                sb.AppendLine($"File size: {FormatFileSize(New FileInfo(zipFilePath).Length)}")
+                sb.AppendLine()
+                sb.AppendLine("Contents:")
+
+                For Each entry In archive.Entries.Take(20) ' Show first 20 entries
+                    sb.AppendLine($"  {entry.FullName} ({FormatFileSize(entry.Length)})")
+                Next
+
+                If archive.Entries.Count > 20 Then
+                    sb.AppendLine($"  ... and {archive.Entries.Count - 20} more files")
+                End If
+
+                MessageBox.Show(sb.ToString(), "Backup Contents", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End Using
+        Catch ex As Exception
+            MessageBox.Show($"Error reading backup file: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
     End Sub
 
     ' === MAIN LOAD EVENT ===

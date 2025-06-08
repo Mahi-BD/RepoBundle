@@ -211,16 +211,31 @@ Public Class FileCombiner
         Return False
     End Function
 
+    ' In your FileCombiner.vb, replace the GetRelativePath method with this fixed version:
+
     Private Function GetRelativePath(fullPath As String, basePath As String) As String
         Try
-            Dim uri1 As New Uri(basePath & "\")
-            Dim uri2 As New Uri(fullPath)
-            Return uri1.MakeRelativeUri(uri2).ToString().Replace("/", "\")
-        Catch
-            ' If URI creation fails, return filename only
+            ' Use simple string manipulation instead of URI to avoid URL encoding
+            Dim normalizedBase As String = Path.GetFullPath(basePath).TrimEnd(Path.DirectorySeparatorChar) & Path.DirectorySeparatorChar
+            Dim normalizedFull As String = Path.GetFullPath(fullPath)
+
+            ' Check if the file is under the base path
+            If normalizedFull.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase) Then
+                ' Remove the base path to get relative path
+                Dim relativePath As String = normalizedFull.Substring(normalizedBase.Length)
+                Return relativePath
+            Else
+                ' If not under base path, return just the filename
+                Return Path.GetFileName(fullPath)
+            End If
+
+        Catch ex As Exception
+            ' Fallback to filename only
             Return Path.GetFileName(fullPath)
         End Try
     End Function
+
+
 
     Private Sub SaveCombinedFile(content As String, fileNumber As Integer)
         Try

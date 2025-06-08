@@ -1,0 +1,87 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore RepoBundle.vbproj
+
+    - name: Build application
+      run: dotnet build RepoBundle.vbproj --configuration ${{ matrix.configuration }} --no-restore
+
+    - name: Create release artifacts
+      if: matrix.configuration == 'Release'
+      run: dotnet publish RepoBundle.vbproj --configuration Release --output ./publish --no-build
+
+    - name: Upload build artifacts
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-artifact@v3
+      with:
+        name: RepoBundle-${{ github.sha }}
+        path: ./publish/
+        retention-days: 30
+
+  release:
+    needs: build
+    runs-on: windows-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: RepoBundle-${{ github.sha }}
+        path: ./release/
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release v${{ github.run_number }}
+        body: |
+          Automated release from main branch
+          
+          Changes in this release:
+          ${{ github.event.head_commit.message }}
+        draft: false
+        prerelease: false
+
+    - name: Create ZIP archive
+      run: |
+        Compress-Archive -Path ./release/* -DestinationPath RepoBundle-v${{ github.run_number }}.zip
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./RepoBundle-v${{ github.run_number }}.zip
+        asset_name: RepoBundle-v${{ github.run_number }}.zip
+        asset_content_type: application/zip
