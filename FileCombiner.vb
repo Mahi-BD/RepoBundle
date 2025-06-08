@@ -273,7 +273,11 @@ Public Class FileCombiner
             Select Case projectType
                 Case "Visual Basic Desktop"
                     ' All VB files and SQL files get full text
-                    Return File.ReadAllText(filePath)
+                    If vbDesktopExtensions.Contains(extension) Then
+                        Return File.ReadAllText(filePath)
+                    Else
+                        Return ""
+                    End If
 
                 Case "Asp Dotnet Core 8", "Asp MVC 5"
                     Select Case extension
@@ -283,18 +287,21 @@ Public Class FileCombiner
                             ' SQL files get full text for all project types
                             Return File.ReadAllText(filePath)
                         Case ".cshtml"
+                            ' Only include layout files (files starting with _)
                             If fileName.StartsWith("_") Then
                                 Return File.ReadAllText(filePath)
                             Else
                                 Return "" ' Skip non-layout CSHTML files
                             End If
                         Case ".css"
+                            ' Only include site.css
                             If fileName = "site.css" Then
                                 Return File.ReadAllText(filePath)
                             Else
                                 Return "" ' Skip other CSS files
                             End If
                         Case ".js"
+                            ' Only include site.js
                             If fileName = "site.js" Then
                                 Return File.ReadAllText(filePath)
                             Else
@@ -319,8 +326,10 @@ Public Class FileCombiner
         For Each filePath In checkedFiles
             If ShouldIncludeFile(filePath, projectType) Then
                 Try
-                    Dim fileContent As String = File.ReadAllText(filePath)
-                    tokenCount += EstimateTokenCount(fileContent)
+                    Dim fileContent As String = GetFileContent(filePath, projectType)
+                    If Not String.IsNullOrEmpty(fileContent) Then
+                        tokenCount += EstimateTokenCount(fileContent)
+                    End If
                 Catch
                     ' Skip files that can't be read
                 End Try

@@ -6,6 +6,25 @@ Public Class IniHelper
 
     Public Sub New(iniFilePath As String)
         filePath = iniFilePath
+        ' Create the file if it doesn't exist
+        If Not File.Exists(filePath) Then
+            CreateDefaultIniFile()
+        End If
+    End Sub
+
+    Private Sub CreateDefaultIniFile()
+        Try
+            ' Ensure directory exists
+            Dim directoryPath As String = Path.GetDirectoryName(filePath)
+            If Not String.IsNullOrEmpty(directoryPath) AndAlso Not Directory.Exists(directoryPath) Then
+                Directory.CreateDirectory(directoryPath)
+            End If
+
+            ' Create empty file with UTF-8 encoding
+            File.WriteAllText(filePath, "", Encoding.UTF8)
+        Catch ex As Exception
+            ' Ignore errors during file creation
+        End Try
     End Sub
 
     Public Function ReadValue(section As String, key As String, Optional defaultValue As String = "") As String
@@ -14,7 +33,7 @@ Public Class IniHelper
         End If
 
         Try
-            Dim lines() As String = File.ReadAllLines(filePath)
+            Dim lines() As String = File.ReadAllLines(filePath, Encoding.UTF8)
             Dim currentSection As String = ""
             Dim inTargetSection As Boolean = False
 
@@ -40,6 +59,9 @@ Public Class IniHelper
                     Dim value As String = trimmedLine.Substring(equalIndex + 1).Trim()
 
                     If currentKey.Equals(key, StringComparison.OrdinalIgnoreCase) Then
+                        ' Handle escaped characters
+                        value = value.Replace("\n", vbCrLf)
+                        value = value.Replace("\\", "\")
                         Return value
                     End If
                 End If
@@ -60,9 +82,18 @@ Public Class IniHelper
         Dim sectionStartIndex As Integer = -1
         Dim sectionEndIndex As Integer = -1
 
+        ' Escape special characters in value
+        value = value.Replace("\", "\\")
+        value = value.Replace(vbCrLf, "\n")
+
         ' Read existing content if file exists
         If File.Exists(filePath) Then
-            lines.AddRange(File.ReadAllLines(filePath))
+            Try
+                lines.AddRange(File.ReadAllLines(filePath, Encoding.UTF8))
+            Catch
+                ' If file can't be read, start fresh
+                lines.Clear()
+            End Try
         End If
 
         ' Find the section and key
@@ -119,7 +150,10 @@ Public Class IniHelper
 
         ' Write back to file
         Try
-            Directory.CreateDirectory(Path.GetDirectoryName(filePath))
+            Dim directoryPath As String = Path.GetDirectoryName(filePath)
+            If Not Directory.Exists(directoryPath) Then
+                Directory.CreateDirectory(directoryPath)
+            End If
             File.WriteAllLines(filePath, lines, Encoding.UTF8)
         Catch ex As Exception
             Throw New Exception("Unable to write to INI file: " & ex.Message)
@@ -134,14 +168,14 @@ Public Class IniHelper
         End If
 
         Try
-            Dim lines() As String = File.ReadAllLines(filePath)
+            Dim lines() As String = File.ReadAllLines(filePath, Encoding.UTF8)
 
             For Each line In lines
                 Dim trimmedLine As String = line.Trim()
 
                 If trimmedLine.StartsWith("[") AndAlso trimmedLine.EndsWith("]") Then
                     Dim sectionName As String = trimmedLine.Substring(1, trimmedLine.Length - 2)
-                    If Not sections.Contains(sectionName) Then
+                    If Not sections.Contains(sectionName, StringComparer.OrdinalIgnoreCase) Then
                         sections.Add(sectionName)
                     End If
                 End If
@@ -161,7 +195,7 @@ Public Class IniHelper
         End If
 
         Try
-            Dim lines() As String = File.ReadAllLines(filePath)
+            Dim lines() As String = File.ReadAllLines(filePath, Encoding.UTF8)
             Dim currentSection As String = ""
             Dim inTargetSection As Boolean = False
 
@@ -184,7 +218,7 @@ Public Class IniHelper
                 If inTargetSection AndAlso trimmedLine.Contains("=") Then
                     Dim equalIndex As Integer = trimmedLine.IndexOf("=")
                     Dim keyName As String = trimmedLine.Substring(0, equalIndex).Trim()
-                    If Not keys.Contains(keyName) Then
+                    If Not keys.Contains(keyName, StringComparer.OrdinalIgnoreCase) Then
                         keys.Add(keyName)
                     End If
                 End If
@@ -202,7 +236,7 @@ Public Class IniHelper
         End If
 
         Try
-            Dim lines As New List(Of String)(File.ReadAllLines(filePath))
+            Dim lines As New List(Of String)(File.ReadAllLines(filePath, Encoding.UTF8))
             Dim currentSection As String = ""
             Dim inTargetSection As Boolean = False
 
@@ -245,10 +279,9 @@ Public Class IniHelper
         End If
 
         Try
-            Dim lines As New List(Of String)(File.ReadAllLines(filePath))
+            Dim lines As New List(Of String)(File.ReadAllLines(filePath, Encoding.UTF8))
             Dim currentSection As String = ""
             Dim inTargetSection As Boolean = False
-            Dim sectionStartIndex As Integer = -1
 
             For i As Integer = lines.Count - 1 To 0 Step -1
                 Dim trimmedLine As String = lines(i).Trim()
@@ -262,7 +295,6 @@ Public Class IniHelper
                         inTargetSection = False
                     ElseIf currentSection.Equals(section, StringComparison.OrdinalIgnoreCase) Then
                         inTargetSection = True
-                        sectionStartIndex = i
                     End If
                 End If
 
@@ -277,4 +309,34 @@ Public Class IniHelper
             Throw New Exception("Unable to delete section from INI file: " & ex.Message)
         End Try
     End Sub
+
+    Public Function SectionExists(section As String) As Boolean
+        Return GetSections().Contains(section, StringComparer.OrdinalIgnoreCase)
+    End Function
+
+    Public Function KeyExists(section As String, key As String) As Boolean
+        Return GetKeys(section).Contains(key, StringComparer.OrdinalIgnoreCase)
+    End Function
+
+    Public Sub CreateSection(section As String)
+        If Not SectionExists(section) Then
+            WriteValue(section, "Created", DateTime.Now.ToString())
+            DeleteKey(section, "Created")
+        End If
+    End Sub
+
+    Public Function GetFilePath() As String
+        Return filePath
+    End Function
+
+    Public Function GetFileSize() As Long
+        Try
+            If File.Exists(filePath) Then
+                Return New FileInfo(filePath).Length
+            End If
+        Catch
+            ' Ignore errors
+        End Try
+        Return 0
+    End Function
 End Class

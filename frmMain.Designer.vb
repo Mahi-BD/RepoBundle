@@ -41,13 +41,16 @@ Partial Class frmMain
         lblTokenCount = New Label()
         btnCombine = New Button()
         grpProjectSettings = New GroupBox()
-        tlpProjectSettings = New TableLayoutPanel()
+        splitContainer2 = New SplitContainer()
+        pnlProjectTop = New Panel()
+        tlpProjectTop = New TableLayoutPanel()
         lblProjectType = New Label()
         cmbProjectType = New ComboBox()
         lblProjectTitle = New Label()
         txtProjectTitle = New TextBox()
         lblProjectInstructions = New Label()
         txtProjectInstructions = New TextBox()
+        pnlProjectBottom = New Panel()
         lblOtherInstructions = New Label()
         txtOtherInstructions = New TextBox()
         grpTemplateManager = New GroupBox()
@@ -62,9 +65,16 @@ Partial Class frmMain
         btnUpdateTemplate = New Button()
         menuStrip1 = New MenuStrip()
         fileToolStripMenuItem = New ToolStripMenuItem()
+        selectProjectFolderToolStripMenuItem = New ToolStripMenuItem()
+        toolStripSeparator2 = New ToolStripSeparator()
+        backupProjectToolStripMenuItem = New ToolStripMenuItem()
+        goToOutputToolStripMenuItem = New ToolStripMenuItem()
+        toolStripSeparator3 = New ToolStripSeparator()
+        makeShortcutToolStripMenuItem = New ToolStripMenuItem()
         toolStripSeparator1 = New ToolStripSeparator()
         exitToolStripMenuItem = New ToolStripMenuItem()
         settingsToolStripMenuItem = New ToolStripMenuItem()
+        applicationSettingsToolStripMenuItem = New ToolStripMenuItem()
         helpToolStripMenuItem = New ToolStripMenuItem()
         aboutToolStripMenuItem = New ToolStripMenuItem()
         statusStrip1 = New StatusStrip()
@@ -86,7 +96,13 @@ Partial Class frmMain
         grpCombineActions.SuspendLayout()
         pnlCombineControls.SuspendLayout()
         grpProjectSettings.SuspendLayout()
-        tlpProjectSettings.SuspendLayout()
+        CType(splitContainer2, ComponentModel.ISupportInitialize).BeginInit()
+        splitContainer2.Panel1.SuspendLayout()
+        splitContainer2.Panel2.SuspendLayout()
+        splitContainer2.SuspendLayout()
+        pnlProjectTop.SuspendLayout()
+        tlpProjectTop.SuspendLayout()
+        pnlProjectBottom.SuspendLayout()
         grpTemplateManager.SuspendLayout()
         tlpTemplateControls.SuspendLayout()
         menuStrip1.SuspendLayout()
@@ -290,7 +306,7 @@ Partial Class frmMain
         ' 
         ' grpProjectSettings
         ' 
-        grpProjectSettings.Controls.Add(tlpProjectSettings)
+        grpProjectSettings.Controls.Add(splitContainer2)
         grpProjectSettings.Dock = DockStyle.Fill
         grpProjectSettings.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
         grpProjectSettings.Location = New Point(4, 128)
@@ -301,30 +317,54 @@ Partial Class frmMain
         grpProjectSettings.TabStop = False
         grpProjectSettings.Text = "Project Configuration"
         ' 
-        ' tlpProjectSettings
+        ' splitContainer2
         ' 
-        tlpProjectSettings.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
-        tlpProjectSettings.ColumnCount = 2
-        tlpProjectSettings.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 130.0F))
-        tlpProjectSettings.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100.0F))
-        tlpProjectSettings.Controls.Add(lblProjectType, 0, 0)
-        tlpProjectSettings.Controls.Add(cmbProjectType, 1, 0)
-        tlpProjectSettings.Controls.Add(lblProjectTitle, 0, 1)
-        tlpProjectSettings.Controls.Add(txtProjectTitle, 1, 1)
-        tlpProjectSettings.Controls.Add(lblProjectInstructions, 0, 2)
-        tlpProjectSettings.Controls.Add(txtProjectInstructions, 1, 2)
-        tlpProjectSettings.Controls.Add(lblOtherInstructions, 0, 3)
-        tlpProjectSettings.Controls.Add(txtOtherInstructions, 1, 3)
-        tlpProjectSettings.Font = New Font("Segoe UI", 9.0F)
-        tlpProjectSettings.Location = New Point(8, 23)
-        tlpProjectSettings.Name = "tlpProjectSettings"
-        tlpProjectSettings.RowCount = 4
-        tlpProjectSettings.RowStyles.Add(New RowStyle(SizeType.Absolute, 35.0F))
-        tlpProjectSettings.RowStyles.Add(New RowStyle(SizeType.Absolute, 35.0F))
-        tlpProjectSettings.RowStyles.Add(New RowStyle(SizeType.Percent, 50.0F))
-        tlpProjectSettings.RowStyles.Add(New RowStyle(SizeType.Percent, 50.0F))
-        tlpProjectSettings.Size = New Size(725, 361)
-        tlpProjectSettings.TabIndex = 0
+        splitContainer2.Dock = DockStyle.Fill
+        splitContainer2.Location = New Point(8, 26)
+        splitContainer2.Name = "splitContainer2"
+        splitContainer2.Orientation = Orientation.Horizontal
+        ' 
+        ' splitContainer2.Panel1
+        ' 
+        splitContainer2.Panel1.Controls.Add(pnlProjectTop)
+        ' 
+        ' splitContainer2.Panel2
+        ' 
+        splitContainer2.Panel2.Controls.Add(pnlProjectBottom)
+        splitContainer2.Size = New Size(725, 476)
+        splitContainer2.SplitterDistance = 240
+        splitContainer2.TabIndex = 0
+        ' 
+        ' pnlProjectTop
+        ' 
+        pnlProjectTop.Controls.Add(tlpProjectTop)
+        pnlProjectTop.Dock = DockStyle.Fill
+        pnlProjectTop.Location = New Point(0, 0)
+        pnlProjectTop.Name = "pnlProjectTop"
+        pnlProjectTop.Size = New Size(725, 240)
+        pnlProjectTop.TabIndex = 0
+        ' 
+        ' tlpProjectTop
+        ' 
+        tlpProjectTop.ColumnCount = 2
+        tlpProjectTop.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 130.0F))
+        tlpProjectTop.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100.0F))
+        tlpProjectTop.Controls.Add(lblProjectType, 0, 0)
+        tlpProjectTop.Controls.Add(cmbProjectType, 1, 0)
+        tlpProjectTop.Controls.Add(lblProjectTitle, 0, 1)
+        tlpProjectTop.Controls.Add(txtProjectTitle, 1, 1)
+        tlpProjectTop.Controls.Add(lblProjectInstructions, 0, 2)
+        tlpProjectTop.Controls.Add(txtProjectInstructions, 1, 2)
+        tlpProjectTop.Dock = DockStyle.Fill
+        tlpProjectTop.Font = New Font("Segoe UI", 9.0F)
+        tlpProjectTop.Location = New Point(0, 0)
+        tlpProjectTop.Name = "tlpProjectTop"
+        tlpProjectTop.RowCount = 3
+        tlpProjectTop.RowStyles.Add(New RowStyle(SizeType.Absolute, 35.0F))
+        tlpProjectTop.RowStyles.Add(New RowStyle(SizeType.Absolute, 35.0F))
+        tlpProjectTop.RowStyles.Add(New RowStyle(SizeType.Percent, 100.0F))
+        tlpProjectTop.Size = New Size(725, 240)
+        tlpProjectTop.TabIndex = 0
         ' 
         ' lblProjectType
         ' 
@@ -381,13 +421,24 @@ Partial Class frmMain
         txtProjectInstructions.Multiline = True
         txtProjectInstructions.Name = "txtProjectInstructions"
         txtProjectInstructions.ScrollBars = ScrollBars.Vertical
-        txtProjectInstructions.Size = New Size(589, 139)
+        txtProjectInstructions.Size = New Size(589, 164)
         txtProjectInstructions.TabIndex = 5
+        ' 
+        ' pnlProjectBottom
+        ' 
+        pnlProjectBottom.Controls.Add(lblOtherInstructions)
+        pnlProjectBottom.Controls.Add(txtOtherInstructions)
+        pnlProjectBottom.Dock = DockStyle.Fill
+        pnlProjectBottom.Location = New Point(0, 0)
+        pnlProjectBottom.Name = "pnlProjectBottom"
+        pnlProjectBottom.Size = New Size(725, 232)
+        pnlProjectBottom.TabIndex = 0
         ' 
         ' lblOtherInstructions
         ' 
         lblOtherInstructions.AutoSize = True
-        lblOtherInstructions.Location = New Point(3, 215)
+        lblOtherInstructions.Font = New Font("Segoe UI", 9.0F)
+        lblOtherInstructions.Location = New Point(3, 8)
         lblOtherInstructions.Name = "lblOtherInstructions"
         lblOtherInstructions.Size = New Size(105, 15)
         lblOtherInstructions.TabIndex = 6
@@ -397,11 +448,11 @@ Partial Class frmMain
         ' 
         txtOtherInstructions.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
         txtOtherInstructions.Font = New Font("Consolas", 9.0F)
-        txtOtherInstructions.Location = New Point(133, 218)
+        txtOtherInstructions.Location = New Point(133, 6)
         txtOtherInstructions.Multiline = True
         txtOtherInstructions.Name = "txtOtherInstructions"
         txtOtherInstructions.ScrollBars = ScrollBars.Vertical
-        txtOtherInstructions.Size = New Size(589, 140)
+        txtOtherInstructions.Size = New Size(589, 223)
         txtOtherInstructions.TabIndex = 7
         ' 
         ' grpTemplateManager
@@ -542,28 +593,69 @@ Partial Class frmMain
         ' 
         ' fileToolStripMenuItem
         ' 
-        fileToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {toolStripSeparator1, exitToolStripMenuItem})
+        fileToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {selectProjectFolderToolStripMenuItem, toolStripSeparator2, backupProjectToolStripMenuItem, goToOutputToolStripMenuItem, toolStripSeparator3, makeShortcutToolStripMenuItem, toolStripSeparator1, exitToolStripMenuItem})
         fileToolStripMenuItem.Name = "fileToolStripMenuItem"
         fileToolStripMenuItem.Size = New Size(37, 20)
         fileToolStripMenuItem.Text = "&File"
         ' 
+        ' selectProjectFolderToolStripMenuItem
+        ' 
+        selectProjectFolderToolStripMenuItem.Name = "selectProjectFolderToolStripMenuItem"
+        selectProjectFolderToolStripMenuItem.Size = New Size(182, 22)
+        selectProjectFolderToolStripMenuItem.Text = "Select Project &Folder"
+        ' 
+        ' toolStripSeparator2
+        ' 
+        toolStripSeparator2.Name = "toolStripSeparator2"
+        toolStripSeparator2.Size = New Size(179, 6)
+        ' 
+        ' backupProjectToolStripMenuItem
+        ' 
+        backupProjectToolStripMenuItem.Name = "backupProjectToolStripMenuItem"
+        backupProjectToolStripMenuItem.Size = New Size(182, 22)
+        backupProjectToolStripMenuItem.Text = "&Backup Project"
+        ' 
+        ' goToOutputToolStripMenuItem
+        ' 
+        goToOutputToolStripMenuItem.Name = "goToOutputToolStripMenuItem"
+        goToOutputToolStripMenuItem.Size = New Size(182, 22)
+        goToOutputToolStripMenuItem.Text = "&Go to Output"
+        ' 
+        ' toolStripSeparator3
+        ' 
+        toolStripSeparator3.Name = "toolStripSeparator3"
+        toolStripSeparator3.Size = New Size(179, 6)
+        ' 
+        ' makeShortcutToolStripMenuItem
+        ' 
+        makeShortcutToolStripMenuItem.Name = "makeShortcutToolStripMenuItem"
+        makeShortcutToolStripMenuItem.Size = New Size(182, 22)
+        makeShortcutToolStripMenuItem.Text = "Make &Shortcut"
+        ' 
         ' toolStripSeparator1
         ' 
         toolStripSeparator1.Name = "toolStripSeparator1"
-        toolStripSeparator1.Size = New Size(132, 6)
+        toolStripSeparator1.Size = New Size(179, 6)
         ' 
         ' exitToolStripMenuItem
         ' 
         exitToolStripMenuItem.Name = "exitToolStripMenuItem"
         exitToolStripMenuItem.ShortcutKeys = Keys.Alt Or Keys.F4
-        exitToolStripMenuItem.Size = New Size(135, 22)
+        exitToolStripMenuItem.Size = New Size(182, 22)
         exitToolStripMenuItem.Text = "E&xit"
         ' 
         ' settingsToolStripMenuItem
         ' 
+        settingsToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {applicationSettingsToolStripMenuItem})
         settingsToolStripMenuItem.Name = "settingsToolStripMenuItem"
         settingsToolStripMenuItem.Size = New Size(61, 20)
         settingsToolStripMenuItem.Text = "&Settings"
+        ' 
+        ' applicationSettingsToolStripMenuItem
+        ' 
+        applicationSettingsToolStripMenuItem.Name = "applicationSettingsToolStripMenuItem"
+        applicationSettingsToolStripMenuItem.Size = New Size(177, 22)
+        applicationSettingsToolStripMenuItem.Text = "&Application Settings"
         ' 
         ' helpToolStripMenuItem
         ' 
@@ -634,7 +726,7 @@ Partial Class frmMain
         MinimumSize = New Size(1000, 600)
         Name = "frmMain"
         StartPosition = FormStartPosition.CenterScreen
-        Text = "Professional Project File Combiner v2.0"
+        Text = "RepoBundle - Project File Combiner v2.0"
         splitContainer1.Panel1.ResumeLayout(False)
         splitContainer1.Panel2.ResumeLayout(False)
         CType(splitContainer1, ComponentModel.ISupportInitialize).EndInit()
@@ -648,8 +740,15 @@ Partial Class frmMain
         pnlCombineControls.ResumeLayout(False)
         pnlCombineControls.PerformLayout()
         grpProjectSettings.ResumeLayout(False)
-        tlpProjectSettings.ResumeLayout(False)
-        tlpProjectSettings.PerformLayout()
+        splitContainer2.Panel1.ResumeLayout(False)
+        splitContainer2.Panel2.ResumeLayout(False)
+        CType(splitContainer2, ComponentModel.ISupportInitialize).EndInit()
+        splitContainer2.ResumeLayout(False)
+        pnlProjectTop.ResumeLayout(False)
+        tlpProjectTop.ResumeLayout(False)
+        tlpProjectTop.PerformLayout()
+        pnlProjectBottom.ResumeLayout(False)
+        pnlProjectBottom.PerformLayout()
         grpTemplateManager.ResumeLayout(False)
         tlpTemplateControls.ResumeLayout(False)
         tlpTemplateControls.PerformLayout()
@@ -689,15 +788,18 @@ Partial Class frmMain
     Friend WithEvents btnCopyTemplate As Button
     Friend WithEvents btnUpdateTemplate As Button
 
-    ' Project Settings Group
+    ' Project Settings Group with SplitContainer
     Friend WithEvents grpProjectSettings As GroupBox
-    Friend WithEvents tlpProjectSettings As TableLayoutPanel
+    Friend WithEvents splitContainer2 As SplitContainer
+    Friend WithEvents pnlProjectTop As Panel
+    Friend WithEvents tlpProjectTop As TableLayoutPanel
     Friend WithEvents lblProjectType As Label
     Friend WithEvents cmbProjectType As ComboBox
     Friend WithEvents lblProjectTitle As Label
     Friend WithEvents txtProjectTitle As TextBox
     Friend WithEvents lblProjectInstructions As Label
     Friend WithEvents txtProjectInstructions As TextBox
+    Friend WithEvents pnlProjectBottom As Panel
     Friend WithEvents lblOtherInstructions As Label
     Friend WithEvents txtOtherInstructions As TextBox
 
@@ -711,9 +813,16 @@ Partial Class frmMain
     ' Menu and Status
     Friend WithEvents menuStrip1 As MenuStrip
     Friend WithEvents fileToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents selectProjectFolderToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents toolStripSeparator2 As ToolStripSeparator
+    Friend WithEvents backupProjectToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents goToOutputToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents toolStripSeparator3 As ToolStripSeparator
+    Friend WithEvents makeShortcutToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents toolStripSeparator1 As ToolStripSeparator
     Friend WithEvents exitToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents settingsToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents applicationSettingsToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents helpToolStripMenuItem As ToolStripMenuItem
     Friend WithEvents aboutToolStripMenuItem As ToolStripMenuItem
 
