@@ -1,0 +1,3479 @@
+﻿==================== FILE TREE ====================
+..\RepoBundle/
+  ApplicationEvents.vb
+  DatabaseReader.vb
+  FileCombiner.vb
+  frmMain.Designer.vb
+  frmMain.vb
+  frmSettings.Designer.vb
+  frmSettings.vb
+  IniHelper.vb
+  RepoBundle.sln
+  RepoBundle.vbproj
+  RepoBundle.vbproj.user
+====================================================
+
+Project Title: RepoBundle
+Generated: 6/8/2025 7:48:58 AM
+
+==================== FILE: ApplicationEvents.vb ====================
+Imports Microsoft.VisualBasic.ApplicationServices
+
+Namespace My
+    ' The following events are available for MyApplication:
+    ' Startup: Raised when the application starts, before the startup form is created.
+    ' Shutdown: Raised after all application forms are closed.  This event is not raised if the application terminates abnormally.
+    ' UnhandledException: Raised if the application encounters an unhandled exception.
+    ' StartupNextInstance: Raised when launching a single-instance application and the application is already active. 
+    ' NetworkAvailabilityChanged: Raised when the network connection is connected or disconnected.
+
+    ' **NEW** ApplyApplicationDefaults: Raised when the application queries default values to be set for the application.
+
+    ' Example:
+    ' Private Sub MyApplication_ApplyApplicationDefaults(sender As Object, e As ApplyApplicationDefaultsEventArgs) Handles Me.ApplyApplicationDefaults
+    '
+    '   ' Setting the application-wide default Font:
+    '   e.Font = New Font(FontFamily.GenericSansSerif, 12, FontStyle.Regular)
+    '
+    '   ' Setting the HighDpiMode for the Application:
+    '   e.HighDpiMode = HighDpiMode.PerMonitorV2
+    '
+    '   ' If a splash dialog is used, this sets the minimum display time:
+    '   e.MinimumSplashScreenDisplayTime = 4000
+    ' End Sub
+
+    Partial Friend Class MyApplication
+
+    End Class
+End Namespace
+
+
+==================== FILE: DatabaseReader.vb ====================
+Imports System.IO
+Imports System.Text
+
+Public Class DatabaseReader
+    Public Shared Function GetDatabaseStructure(databasePath As String, databaseName As String) As String
+        Try
+            Dim result As String = ""
+            result += "==================== DATABASE STRUCTURE ====================" + vbCrLf
+            result += "Database Name: " + databaseName + vbCrLf
+            result += "Database File: " + Path.GetFileName(databasePath) + vbCrLf
+            result += "File Size: " + GetFileSize(databasePath) + vbCrLf
+            result += "Last Modified: " + File.GetLastWriteTime(databasePath).ToString() + vbCrLf
+            result += "============================================================" + vbCrLf
+            result += vbCrLf
+
+            If Path.GetExtension(databasePath).ToLower() = ".sql" Then
+                result += "SQL Schema File Content:" + vbCrLf
+                result += "------------------------" + vbCrLf
+                result += File.ReadAllText(databasePath) + vbCrLf
+            Else
+                result += "Unsupported file type. Only .sql files are supported." + vbCrLf
+            End If
+
+            result += vbCrLf
+            result += "==================== END DATABASE ====================" + vbCrLf
+
+            Return result
+        Catch ex As Exception
+            Return "Error reading database structure: " + ex.Message
+        End Try
+    End Function
+
+    Private Shared Function GetFileSize(filePath As String) As String
+        Try
+            Dim info As New FileInfo(filePath)
+            Dim size As Long = info.Length
+
+            If size < 1024 Then
+                Return size.ToString() + " bytes"
+            ElseIf size < 1024 * 1024 Then
+                Return Math.Round(size / 1024.0, 1).ToString() + " KB"
+            Else
+                Return Math.Round(size / (1024.0 * 1024.0), 1).ToString() + " MB"
+            End If
+        Catch
+            Return "Unknown"
+        End Try
+    End Function
+End Class
+
+==================== FILE: FileCombiner.vb ====================
+Imports System.IO
+Imports System.Text
+
+Public Class FileCombiner
+    Private projectFolder As String
+    Private outputFolder As String
+    Private fileDelimiter As String = "==================== FILE: {0} ===================="
+
+    ' File extension lists for different project types
+    Private vbDesktopExtensions As String() = {".vb", ".designer.vb", ".vbproj", ".sql"}
+    Private aspCoreExtensions As String() = {".cs", ".cshtml", ".css", ".js", ".sql"}
+    Private mediaExtensions As String() = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp", ".avif", ".apng",
+                                          ".heif", ".heic", ".svg", ".pdf", ".eps", ".ai", ".cdr", ".wmf", ".emf", ".raw",
+                                          ".cr2", ".nef", ".orf", ".rw2", ".dng", ".wav", ".aiff", ".au", ".flac", ".alac",
+                                          ".ape", ".wv", ".mp3", ".aac", ".m4a", ".ogg", ".opus", ".wma", ".amr", ".mp4",
+                                          ".m4v", ".mov", ".avi", ".wmv", ".flv", ".webm", ".mkv", ".mpg", ".mpeg", ".mp2",
+                                          ".mpe", ".mpv", ".3gp", ".3g2", ".ts", ".mts", ".m2ts", ".ogv", ".rm", ".rmvb", ".asf"}
+
+    Public Sub New(projectFolderPath As String, outputFolderPath As String)
+        projectFolder = projectFolderPath
+        outputFolder = outputFolderPath
+    End Sub
+
+    Public Function CombineFiles(checkedFiles As List(Of String), projectType As String, treeNodes As TreeNodeCollection, Optional projectTitle As String = "", Optional databasePath As String = "", Optional databaseName As String = "", Optional includeDatabase As Boolean = False, Optional sqlFiles As List(Of String) = Nothing) As CombineResult
+        Try
+            ' Validate inputs
+            If checkedFiles Is Nothing OrElse checkedFiles.Count = 0 Then
+                Return New CombineResult(False, "No files selected for combining")
+            End If
+
+            If String.IsNullOrWhiteSpace(outputFolder) Then
+                Return New CombineResult(False, "Output folder not specified")
+            End If
+
+            If String.IsNullOrWhiteSpace(projectType) Then
+                Return New CombineResult(False, "Project type not specified")
+            End If
+
+            ' Ensure output folder exists
+            If Not Directory.Exists(outputFolder) Then
+                Try
+                    Directory.CreateDirectory(outputFolder)
+                Catch ex As Exception
+                    Return New CombineResult(False, "Cannot create output folder: " & ex.Message)
+                End Try
+            End If
+
+            Dim combinedContent As New StringBuilder()
+            Dim fileTreeContent As New StringBuilder()
+            Dim fileCounter As Integer = 1
+            Dim currentFileSize As Integer = 0
+            Dim processedFiles As Integer = 0
+            Dim includedFiles As Integer = 0
+            Const maxFileSize As Integer = 200 * 1024 ' 200KB
+
+            ' Generate file tree (only for first file)
+            fileTreeContent.AppendLine("==================== FILE TREE ====================")
+            GenerateFileTree(treeNodes, "", fileTreeContent)
+            fileTreeContent.AppendLine("====================================================")
+            fileTreeContent.AppendLine()
+
+            ' Use project title if provided, otherwise use project type
+            If Not String.IsNullOrWhiteSpace(projectTitle) Then
+                fileTreeContent.AppendLine("Project Title: " & projectTitle)
+            Else
+                fileTreeContent.AppendLine("Project Type: " & projectType)
+            End If
+
+            fileTreeContent.AppendLine("Generated: " & DateTime.Now.ToString())
+            fileTreeContent.AppendLine()
+
+            ' Add database structure if requested and available
+            If includeDatabase Then
+                ' Handle single database file (backward compatibility)
+                If Not String.IsNullOrWhiteSpace(databasePath) AndAlso Not String.IsNullOrWhiteSpace(databaseName) Then
+                    If File.Exists(databasePath) Then
+                        Try
+                            Dim dbStructure As String = DatabaseReader.GetDatabaseStructure(databasePath, databaseName)
+                            fileTreeContent.AppendLine(dbStructure)
+                            fileTreeContent.AppendLine()
+                        Catch ex As Exception
+                            fileTreeContent.AppendLine("==================== DATABASE ERROR ====================")
+                            fileTreeContent.AppendLine("Error reading database: " & ex.Message)
+                            fileTreeContent.AppendLine("======================================================")
+                            fileTreeContent.AppendLine()
+                        End Try
+                    Else
+                        fileTreeContent.AppendLine("==================== DATABASE ERROR ====================")
+                        fileTreeContent.AppendLine("Database file not found: " & databasePath)
+                        fileTreeContent.AppendLine("======================================================")
+                        fileTreeContent.AppendLine()
+                    End If
+                End If
+
+                ' Handle multiple SQL schema files
+                If sqlFiles IsNot Nothing AndAlso sqlFiles.Count > 0 Then
+                    For Each sqlFile In sqlFiles
+                        If File.Exists(sqlFile) AndAlso Path.GetExtension(sqlFile).ToLower() = ".sql" Then
+                            Try
+                                Dim dbName As String = Path.GetFileNameWithoutExtension(sqlFile)
+                                Dim dbStructure As String = DatabaseReader.GetDatabaseStructure(sqlFile, dbName)
+                                fileTreeContent.AppendLine(dbStructure)
+                                fileTreeContent.AppendLine()
+                            Catch ex As Exception
+                                fileTreeContent.AppendLine("==================== SQL SCHEMA ERROR ====================")
+                                fileTreeContent.AppendLine("Error reading SQL schema file '" & sqlFile & "': " & ex.Message)
+                                fileTreeContent.AppendLine("=========================================================")
+                                fileTreeContent.AppendLine()
+                            End Try
+                        End If
+                    Next
+                End If
+            End If
+
+            ' Add file tree only to the first file
+            combinedContent.Append(fileTreeContent.ToString())
+            currentFileSize += fileTreeContent.Length
+
+            ' Process each checked file
+            For Each filePath In checkedFiles
+                processedFiles += 1
+                If ShouldIncludeFile(filePath, projectType) Then
+                    Dim fileContent As String = GetFileContent(filePath, projectType)
+                    If Not String.IsNullOrEmpty(fileContent) Then
+                        Dim delimiter As String = String.Format(fileDelimiter, GetRelativePath(filePath, projectFolder))
+                        Dim section As String = delimiter & vbCrLf & fileContent & vbCrLf & vbCrLf
+
+                        ' Check if adding this file would exceed the size limit
+                        If currentFileSize + section.Length > maxFileSize AndAlso combinedContent.Length > fileTreeContent.Length Then
+                            ' Save current file and start a new one
+                            SaveCombinedFile(combinedContent.ToString(), fileCounter)
+                            fileCounter += 1
+                            combinedContent.Clear()
+                            ' Don't add file tree to subsequent files - start clean
+                            currentFileSize = 0
+                        End If
+
+                        combinedContent.Append(section)
+                        currentFileSize += section.Length
+                        includedFiles += 1
+                    End If
+                End If
+            Next
+
+            ' Always save at least one file, even if no content was added
+            If combinedContent.Length > 0 Then
+                ' Save the final file with content
+                SaveCombinedFile(combinedContent.ToString(), fileCounter)
+            Else
+                ' No files were included - save a file with just the tree and explanation
+                combinedContent.Append(fileTreeContent.ToString())
+                combinedContent.AppendLine("No files matched the '" & projectType & "' project type criteria.")
+                combinedContent.AppendLine()
+                combinedContent.AppendLine("Possible reasons:")
+                combinedContent.AppendLine("- Selected files don't match the project type extensions")
+                combinedContent.AppendLine("- Files are empty or unreadable")
+                combinedContent.AppendLine("- Project type filter excludes these file types")
+                combinedContent.AppendLine()
+                combinedContent.AppendLine("Total files processed: " & processedFiles.ToString())
+                combinedContent.AppendLine("Files included: " & includedFiles.ToString())
+
+                SaveCombinedFile(combinedContent.ToString(), fileCounter)
+            End If
+
+            Dim message As String = "Combined " & includedFiles.ToString() & " of " & processedFiles.ToString() & " files into " & fileCounter.ToString() & " output file(s) in " & outputFolder
+            Return New CombineResult(True, message, fileCounter, includedFiles)
+
+        Catch ex As Exception
+            Return New CombineResult(False, "Error combining files: " & ex.Message)
+        End Try
+    End Function
+
+    Private Sub GenerateFileTree(nodes As TreeNodeCollection, indent As String, treeContent As StringBuilder)
+        For Each node As TreeNode In nodes
+            If node.Checked AndAlso node.Tag IsNot Nothing Then
+                Dim path As String = node.Tag.ToString()
+                Dim relativePath As String = GetRelativePath(path, projectFolder)
+
+                ' Only include checked items
+                If Directory.Exists(path) Then
+                    ' This is a folder - only show if it has checked children
+                    If HasCheckedChildren(node) Then
+                        treeContent.AppendLine(indent & relativePath & "/")
+                        GenerateFileTree(node.Nodes, indent & "  ", treeContent)
+                    End If
+                ElseIf File.Exists(path) Then
+                    ' This is a file - show it since it's checked
+                    treeContent.AppendLine(indent & relativePath)
+                End If
+            ElseIf node.Tag IsNot Nothing AndAlso Directory.Exists(node.Tag.ToString()) Then
+                ' This folder is not checked, but check if it has checked children
+                If HasCheckedChildren(node) Then
+                    Dim path As String = node.Tag.ToString()
+                    Dim relativePath As String = GetRelativePath(path, projectFolder)
+                    treeContent.AppendLine(indent & relativePath & "/")
+                    GenerateFileTree(node.Nodes, indent & "  ", treeContent)
+                End If
+            End If
+        Next
+    End Sub
+
+    Private Function HasCheckedChildren(parentNode As TreeNode) As Boolean
+        For Each childNode As TreeNode In parentNode.Nodes
+            If childNode.Checked Then
+                Return True
+            End If
+            If HasCheckedChildren(childNode) Then
+                Return True
+            End If
+        Next
+        Return False
+    End Function
+
+    Private Function GetRelativePath(fullPath As String, basePath As String) As String
+        Try
+            Dim uri1 As New Uri(basePath & "\")
+            Dim uri2 As New Uri(fullPath)
+            Return uri1.MakeRelativeUri(uri2).ToString().Replace("/", "\")
+        Catch
+            ' If URI creation fails, return filename only
+            Return Path.GetFileName(fullPath)
+        End Try
+    End Function
+
+    Private Sub SaveCombinedFile(content As String, fileNumber As Integer)
+        Try
+            Dim fileName As String = $"data{fileNumber:D3}.txt"
+            Dim filePath As String = Path.Combine(outputFolder, fileName)
+
+            ' Ensure the output directory exists
+            Dim directoryPath As String = Path.GetDirectoryName(filePath)
+            If Not Directory.Exists(directoryPath) Then
+                Directory.CreateDirectory(directoryPath)
+            End If
+
+            ' Always create/overwrite the file
+            File.WriteAllText(filePath, content, Encoding.UTF8)
+
+        Catch ex As Exception
+            Throw New Exception($"Failed to save file data{fileNumber:D3}.txt: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Function ShouldIncludeFile(filePath As String, projectType As String) As Boolean
+        If Not File.Exists(filePath) Then
+            Return False
+        End If
+
+        Dim extension As String = Path.GetExtension(filePath).ToLower()
+
+        ' Skip media files for all project types
+        If mediaExtensions.Contains(extension) Then
+            Return False
+        End If
+
+        Select Case projectType
+            Case "Visual Basic Desktop"
+                Return vbDesktopExtensions.Contains(extension)
+            Case "Asp Dotnet Core 8"
+                Return aspCoreExtensions.Contains(extension)
+            Case "Asp MVC 5"
+                Return aspCoreExtensions.Contains(extension)
+            Case Else
+                Return False
+        End Select
+    End Function
+
+    Private Function GetFileContent(filePath As String, projectType As String) As String
+        Try
+            Dim extension As String = Path.GetExtension(filePath).ToLower()
+            Dim fileName As String = Path.GetFileName(filePath).ToLower()
+
+            Select Case projectType
+                Case "Visual Basic Desktop"
+                    ' All VB files and SQL files get full text
+                    Return File.ReadAllText(filePath)
+
+                Case "Asp Dotnet Core 8", "Asp MVC 5"
+                    Select Case extension
+                        Case ".cs"
+                            Return File.ReadAllText(filePath)
+                        Case ".sql"
+                            ' SQL files get full text for all project types
+                            Return File.ReadAllText(filePath)
+                        Case ".cshtml"
+                            If fileName.StartsWith("_") Then
+                                Return File.ReadAllText(filePath)
+                            Else
+                                Return "" ' Skip non-layout CSHTML files
+                            End If
+                        Case ".css"
+                            If fileName = "site.css" Then
+                                Return File.ReadAllText(filePath)
+                            Else
+                                Return "" ' Skip other CSS files
+                            End If
+                        Case ".js"
+                            If fileName = "site.js" Then
+                                Return File.ReadAllText(filePath)
+                            Else
+                                Return "" ' Skip other JS files
+                            End If
+                        Case Else
+                            Return ""
+                    End Select
+
+                Case Else
+                    Return ""
+            End Select
+        Catch ex As Exception
+            ' If file can't be read, return empty content
+            Return ""
+        End Try
+    End Function
+
+    Public Function EstimateTokenCount(checkedFiles As List(Of String), projectType As String) As Integer
+        Dim tokenCount As Integer = 0
+
+        For Each filePath In checkedFiles
+            If ShouldIncludeFile(filePath, projectType) Then
+                Try
+                    Dim fileContent As String = File.ReadAllText(filePath)
+                    tokenCount += EstimateTokenCount(fileContent)
+                Catch
+                    ' Skip files that can't be read
+                End Try
+            End If
+        Next
+
+        Return tokenCount
+    End Function
+
+    Private Function EstimateTokenCount(text As String) As Integer
+        ' Simple token estimation: approximately 4 characters per token
+        Return Math.Ceiling(text.Length / 4)
+    End Function
+End Class
+
+Public Class CombineResult
+    Public Property Success As Boolean
+    Public Property Message As String
+    Public Property FileCount As Integer
+    Public Property ProcessedFiles As Integer
+
+    Public Sub New(success As Boolean, message As String)
+        Me.Success = success
+        Me.Message = message
+        Me.FileCount = 0
+        Me.ProcessedFiles = 0
+    End Sub
+
+    Public Sub New(success As Boolean, message As String, fileCount As Integer, processedFiles As Integer)
+        Me.Success = success
+        Me.Message = message
+        Me.FileCount = fileCount
+        Me.ProcessedFiles = processedFiles
+    End Sub
+
+End Class
+
+==================== FILE: frmMain.Designer.vb ====================
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class frmMain
+    Inherits System.Windows.Forms.Form
+
+    'Form overrides dispose to clean up the component list.
+    <System.Diagnostics.DebuggerNonUserCode()>
+    Protected Overrides Sub Dispose(disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    'Required by the Windows Form Designer
+    Private components As System.ComponentModel.IContainer
+
+    'NOTE: The following procedure is required by the Windows Form Designer
+    'It can be modified using the Windows Form Designer.  
+    'Do not modify it using the code editor.
+    <System.Diagnostics.DebuggerStepThrough()>
+    Private Sub InitializeComponent()
+        components = New ComponentModel.Container()
+        splitContainer1 = New SplitContainer()
+        leftPanel = New Panel()
+        grpFileSelection = New GroupBox()
+        treeView1 = New TreeView()
+        contextMenuStrip1 = New ContextMenuStrip(components)
+        selectFileToolStripMenuItem = New ToolStripMenuItem()
+        selectFolderToolStripMenuItem = New ToolStripMenuItem()
+        pnlTreeActions = New Panel()
+        btnCollapseAll = New Button()
+        btnExpandAll = New Button()
+        btnRefreshTree = New Button()
+        rightPanel = New Panel()
+        grpCombineActions = New GroupBox()
+        pnlCombineControls = New Panel()
+        progressBar1 = New ProgressBar()
+        lblTokenCount = New Label()
+        btnCombine = New Button()
+        grpProjectSettings = New GroupBox()
+        tlpProjectSettings = New TableLayoutPanel()
+        lblProjectType = New Label()
+        cmbProjectType = New ComboBox()
+        lblProjectTitle = New Label()
+        txtProjectTitle = New TextBox()
+        lblProjectInstructions = New Label()
+        txtProjectInstructions = New TextBox()
+        lblOtherInstructions = New Label()
+        txtOtherInstructions = New TextBox()
+        grpTemplateManager = New GroupBox()
+        tlpTemplateControls = New TableLayoutPanel()
+        lblTemplateName = New Label()
+        txtTemplateName = New TextBox()
+        btnSaveTemplate = New Button()
+        lblTemplate = New Label()
+        cmbTemplate = New ComboBox()
+        btnLoadTemplate = New Button()
+        btnCopyTemplate = New Button()
+        btnUpdateTemplate = New Button()
+        menuStrip1 = New MenuStrip()
+        fileToolStripMenuItem = New ToolStripMenuItem()
+        toolStripSeparator1 = New ToolStripSeparator()
+        exitToolStripMenuItem = New ToolStripMenuItem()
+        settingsToolStripMenuItem = New ToolStripMenuItem()
+        helpToolStripMenuItem = New ToolStripMenuItem()
+        aboutToolStripMenuItem = New ToolStripMenuItem()
+        statusStrip1 = New StatusStrip()
+        toolStripStatusLabel1 = New ToolStripStatusLabel()
+        toolStripProgressBar1 = New ToolStripProgressBar()
+        toolStripStatusLabelFiles = New ToolStripStatusLabel()
+        folderBrowserDialog1 = New FolderBrowserDialog()
+        openFileDialog1 = New OpenFileDialog()
+        saveFileDialog1 = New SaveFileDialog()
+        CType(splitContainer1, ComponentModel.ISupportInitialize).BeginInit()
+        splitContainer1.Panel1.SuspendLayout()
+        splitContainer1.Panel2.SuspendLayout()
+        splitContainer1.SuspendLayout()
+        leftPanel.SuspendLayout()
+        grpFileSelection.SuspendLayout()
+        contextMenuStrip1.SuspendLayout()
+        pnlTreeActions.SuspendLayout()
+        rightPanel.SuspendLayout()
+        grpCombineActions.SuspendLayout()
+        pnlCombineControls.SuspendLayout()
+        grpProjectSettings.SuspendLayout()
+        tlpProjectSettings.SuspendLayout()
+        grpTemplateManager.SuspendLayout()
+        tlpTemplateControls.SuspendLayout()
+        menuStrip1.SuspendLayout()
+        statusStrip1.SuspendLayout()
+        SuspendLayout()
+        ' 
+        ' splitContainer1
+        ' 
+        splitContainer1.Dock = DockStyle.Fill
+        splitContainer1.Location = New Point(0, 24)
+        splitContainer1.Name = "splitContainer1"
+        ' 
+        ' splitContainer1.Panel1
+        ' 
+        splitContainer1.Panel1.Controls.Add(leftPanel)
+        ' 
+        ' splitContainer1.Panel2
+        ' 
+        splitContainer1.Panel2.Controls.Add(rightPanel)
+        splitContainer1.Size = New Size(1138, 646)
+        splitContainer1.SplitterDistance = 379
+        splitContainer1.SplitterWidth = 6
+        splitContainer1.TabIndex = 0
+        ' 
+        ' leftPanel
+        ' 
+        leftPanel.Controls.Add(grpFileSelection)
+        leftPanel.Dock = DockStyle.Fill
+        leftPanel.Location = New Point(0, 0)
+        leftPanel.Name = "leftPanel"
+        leftPanel.Padding = New Padding(8)
+        leftPanel.Size = New Size(379, 646)
+        leftPanel.TabIndex = 0
+        ' 
+        ' grpFileSelection
+        ' 
+        grpFileSelection.Controls.Add(treeView1)
+        grpFileSelection.Controls.Add(pnlTreeActions)
+        grpFileSelection.Dock = DockStyle.Fill
+        grpFileSelection.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
+        grpFileSelection.Location = New Point(8, 8)
+        grpFileSelection.Name = "grpFileSelection"
+        grpFileSelection.Padding = New Padding(8)
+        grpFileSelection.Size = New Size(363, 630)
+        grpFileSelection.TabIndex = 0
+        grpFileSelection.TabStop = False
+        grpFileSelection.Text = "File Selection"
+        ' 
+        ' treeView1
+        ' 
+        treeView1.CheckBoxes = True
+        treeView1.ContextMenuStrip = contextMenuStrip1
+        treeView1.Dock = DockStyle.Fill
+        treeView1.Font = New Font("Segoe UI", 9.0F)
+        treeView1.FullRowSelect = True
+        treeView1.HideSelection = False
+        treeView1.Location = New Point(8, 26)
+        treeView1.Name = "treeView1"
+        treeView1.Size = New Size(347, 556)
+        treeView1.TabIndex = 0
+        ' 
+        ' contextMenuStrip1
+        ' 
+        contextMenuStrip1.Items.AddRange(New ToolStripItem() {selectFileToolStripMenuItem, selectFolderToolStripMenuItem})
+        contextMenuStrip1.Name = "contextMenuStrip1"
+        contextMenuStrip1.Size = New Size(142, 48)
+        ' 
+        ' selectFileToolStripMenuItem
+        ' 
+        selectFileToolStripMenuItem.Name = "selectFileToolStripMenuItem"
+        selectFileToolStripMenuItem.Size = New Size(141, 22)
+        selectFileToolStripMenuItem.Text = "Select File(s)"
+        ' 
+        ' selectFolderToolStripMenuItem
+        ' 
+        selectFolderToolStripMenuItem.Name = "selectFolderToolStripMenuItem"
+        selectFolderToolStripMenuItem.Size = New Size(141, 22)
+        selectFolderToolStripMenuItem.Text = "Select Folder"
+        ' 
+        ' pnlTreeActions
+        ' 
+        pnlTreeActions.Controls.Add(btnCollapseAll)
+        pnlTreeActions.Controls.Add(btnExpandAll)
+        pnlTreeActions.Controls.Add(btnRefreshTree)
+        pnlTreeActions.Dock = DockStyle.Bottom
+        pnlTreeActions.Location = New Point(8, 582)
+        pnlTreeActions.Name = "pnlTreeActions"
+        pnlTreeActions.Size = New Size(347, 40)
+        pnlTreeActions.TabIndex = 1
+        ' 
+        ' btnCollapseAll
+        ' 
+        btnCollapseAll.BackColor = Color.FromArgb(CByte(255), CByte(193), CByte(7))
+        btnCollapseAll.FlatStyle = FlatStyle.Flat
+        btnCollapseAll.Font = New Font("Segoe UI", 9.0F)
+        btnCollapseAll.ForeColor = Color.Black
+        btnCollapseAll.Location = New Point(148, 7)
+        btnCollapseAll.Name = "btnCollapseAll"
+        btnCollapseAll.Size = New Size(70, 28)
+        btnCollapseAll.TabIndex = 4
+        btnCollapseAll.Text = "Collapse"
+        btnCollapseAll.UseVisualStyleBackColor = False
+        ' 
+        ' btnExpandAll
+        ' 
+        btnExpandAll.BackColor = Color.FromArgb(CByte(40), CByte(167), CByte(69))
+        btnExpandAll.FlatStyle = FlatStyle.Flat
+        btnExpandAll.Font = New Font("Segoe UI", 9.0F)
+        btnExpandAll.ForeColor = Color.White
+        btnExpandAll.Location = New Point(74, 7)
+        btnExpandAll.Name = "btnExpandAll"
+        btnExpandAll.Size = New Size(70, 28)
+        btnExpandAll.TabIndex = 3
+        btnExpandAll.Text = "Expand"
+        btnExpandAll.UseVisualStyleBackColor = False
+        ' 
+        ' btnRefreshTree
+        ' 
+        btnRefreshTree.BackColor = Color.FromArgb(CByte(108), CByte(117), CByte(125))
+        btnRefreshTree.FlatStyle = FlatStyle.Flat
+        btnRefreshTree.Font = New Font("Segoe UI", 9.0F)
+        btnRefreshTree.ForeColor = Color.White
+        btnRefreshTree.Location = New Point(0, 7)
+        btnRefreshTree.Name = "btnRefreshTree"
+        btnRefreshTree.Size = New Size(70, 28)
+        btnRefreshTree.TabIndex = 2
+        btnRefreshTree.Text = "Refresh"
+        btnRefreshTree.UseVisualStyleBackColor = False
+        ' 
+        ' rightPanel
+        ' 
+        rightPanel.Controls.Add(grpCombineActions)
+        rightPanel.Controls.Add(grpProjectSettings)
+        rightPanel.Controls.Add(grpTemplateManager)
+        rightPanel.Dock = DockStyle.Fill
+        rightPanel.Location = New Point(0, 0)
+        rightPanel.Name = "rightPanel"
+        rightPanel.Padding = New Padding(4, 8, 8, 8)
+        rightPanel.Size = New Size(753, 646)
+        rightPanel.TabIndex = 0
+        ' 
+        ' grpCombineActions
+        ' 
+        grpCombineActions.Controls.Add(pnlCombineControls)
+        grpCombineActions.Dock = DockStyle.Bottom
+        grpCombineActions.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
+        grpCombineActions.Location = New Point(4, 518)
+        grpCombineActions.Name = "grpCombineActions"
+        grpCombineActions.Padding = New Padding(8)
+        grpCombineActions.Size = New Size(741, 120)
+        grpCombineActions.TabIndex = 2
+        grpCombineActions.TabStop = False
+        grpCombineActions.Text = "Combine Files"
+        ' 
+        ' pnlCombineControls
+        ' 
+        pnlCombineControls.Controls.Add(progressBar1)
+        pnlCombineControls.Controls.Add(lblTokenCount)
+        pnlCombineControls.Controls.Add(btnCombine)
+        pnlCombineControls.Dock = DockStyle.Fill
+        pnlCombineControls.Font = New Font("Segoe UI", 9.0F)
+        pnlCombineControls.Location = New Point(8, 26)
+        pnlCombineControls.Name = "pnlCombineControls"
+        pnlCombineControls.Size = New Size(725, 86)
+        pnlCombineControls.TabIndex = 0
+        ' 
+        ' progressBar1
+        ' 
+        progressBar1.Anchor = AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        progressBar1.Location = New Point(8, 57)
+        progressBar1.Name = "progressBar1"
+        progressBar1.Size = New Size(704, 20)
+        progressBar1.Style = ProgressBarStyle.Continuous
+        progressBar1.TabIndex = 5
+        progressBar1.Visible = False
+        ' 
+        ' lblTokenCount
+        ' 
+        lblTokenCount.Anchor = AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        lblTokenCount.AutoSize = True
+        lblTokenCount.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold)
+        lblTokenCount.ForeColor = Color.FromArgb(CByte(40), CByte(167), CByte(69))
+        lblTokenCount.Location = New Point(220, 23)
+        lblTokenCount.Name = "lblTokenCount"
+        lblTokenCount.Size = New Size(108, 19)
+        lblTokenCount.TabIndex = 4
+        lblTokenCount.Text = "Token Count: 0"
+        ' 
+        ' btnCombine
+        ' 
+        btnCombine.BackColor = Color.FromArgb(CByte(220), CByte(53), CByte(69))
+        btnCombine.FlatStyle = FlatStyle.Flat
+        btnCombine.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold)
+        btnCombine.ForeColor = Color.White
+        btnCombine.Location = New Point(8, 8)
+        btnCombine.Name = "btnCombine"
+        btnCombine.Size = New Size(200, 45)
+        btnCombine.TabIndex = 3
+        btnCombine.Text = "🔗 Combine Files"
+        btnCombine.UseVisualStyleBackColor = False
+        ' 
+        ' grpProjectSettings
+        ' 
+        grpProjectSettings.Controls.Add(tlpProjectSettings)
+        grpProjectSettings.Dock = DockStyle.Fill
+        grpProjectSettings.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
+        grpProjectSettings.Location = New Point(4, 128)
+        grpProjectSettings.Name = "grpProjectSettings"
+        grpProjectSettings.Padding = New Padding(8)
+        grpProjectSettings.Size = New Size(741, 510)
+        grpProjectSettings.TabIndex = 1
+        grpProjectSettings.TabStop = False
+        grpProjectSettings.Text = "Project Configuration"
+        ' 
+        ' tlpProjectSettings
+        ' 
+        tlpProjectSettings.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        tlpProjectSettings.ColumnCount = 2
+        tlpProjectSettings.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 130.0F))
+        tlpProjectSettings.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100.0F))
+        tlpProjectSettings.Controls.Add(lblProjectType, 0, 0)
+        tlpProjectSettings.Controls.Add(cmbProjectType, 1, 0)
+        tlpProjectSettings.Controls.Add(lblProjectTitle, 0, 1)
+        tlpProjectSettings.Controls.Add(txtProjectTitle, 1, 1)
+        tlpProjectSettings.Controls.Add(lblProjectInstructions, 0, 2)
+        tlpProjectSettings.Controls.Add(txtProjectInstructions, 1, 2)
+        tlpProjectSettings.Controls.Add(lblOtherInstructions, 0, 3)
+        tlpProjectSettings.Controls.Add(txtOtherInstructions, 1, 3)
+        tlpProjectSettings.Font = New Font("Segoe UI", 9.0F)
+        tlpProjectSettings.Location = New Point(8, 23)
+        tlpProjectSettings.Name = "tlpProjectSettings"
+        tlpProjectSettings.RowCount = 4
+        tlpProjectSettings.RowStyles.Add(New RowStyle(SizeType.Absolute, 35.0F))
+        tlpProjectSettings.RowStyles.Add(New RowStyle(SizeType.Absolute, 35.0F))
+        tlpProjectSettings.RowStyles.Add(New RowStyle(SizeType.Percent, 50.0F))
+        tlpProjectSettings.RowStyles.Add(New RowStyle(SizeType.Percent, 50.0F))
+        tlpProjectSettings.Size = New Size(725, 361)
+        tlpProjectSettings.TabIndex = 0
+        ' 
+        ' lblProjectType
+        ' 
+        lblProjectType.Anchor = AnchorStyles.Left Or AnchorStyles.Right
+        lblProjectType.AutoSize = True
+        lblProjectType.Location = New Point(3, 10)
+        lblProjectType.Name = "lblProjectType"
+        lblProjectType.Size = New Size(124, 15)
+        lblProjectType.TabIndex = 0
+        lblProjectType.Text = "Project Type:"
+        ' 
+        ' cmbProjectType
+        ' 
+        cmbProjectType.Anchor = AnchorStyles.Left Or AnchorStyles.Right
+        cmbProjectType.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbProjectType.FormattingEnabled = True
+        cmbProjectType.Location = New Point(133, 6)
+        cmbProjectType.Name = "cmbProjectType"
+        cmbProjectType.Size = New Size(589, 23)
+        cmbProjectType.TabIndex = 1
+        ' 
+        ' lblProjectTitle
+        ' 
+        lblProjectTitle.Anchor = AnchorStyles.Left Or AnchorStyles.Right
+        lblProjectTitle.AutoSize = True
+        lblProjectTitle.Location = New Point(3, 45)
+        lblProjectTitle.Name = "lblProjectTitle"
+        lblProjectTitle.Size = New Size(124, 15)
+        lblProjectTitle.TabIndex = 2
+        lblProjectTitle.Text = "Project Title:"
+        ' 
+        ' txtProjectTitle
+        ' 
+        txtProjectTitle.Anchor = AnchorStyles.Left Or AnchorStyles.Right
+        txtProjectTitle.Location = New Point(133, 41)
+        txtProjectTitle.Name = "txtProjectTitle"
+        txtProjectTitle.Size = New Size(589, 23)
+        txtProjectTitle.TabIndex = 3
+        ' 
+        ' lblProjectInstructions
+        ' 
+        lblProjectInstructions.AutoSize = True
+        lblProjectInstructions.Location = New Point(3, 70)
+        lblProjectInstructions.Name = "lblProjectInstructions"
+        lblProjectInstructions.Size = New Size(112, 15)
+        lblProjectInstructions.TabIndex = 4
+        lblProjectInstructions.Text = "Project Instructions:"
+        ' 
+        ' txtProjectInstructions
+        ' 
+        txtProjectInstructions.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        txtProjectInstructions.Font = New Font("Consolas", 9.0F)
+        txtProjectInstructions.Location = New Point(133, 73)
+        txtProjectInstructions.Multiline = True
+        txtProjectInstructions.Name = "txtProjectInstructions"
+        txtProjectInstructions.ScrollBars = ScrollBars.Vertical
+        txtProjectInstructions.Size = New Size(589, 139)
+        txtProjectInstructions.TabIndex = 5
+        ' 
+        ' lblOtherInstructions
+        ' 
+        lblOtherInstructions.AutoSize = True
+        lblOtherInstructions.Location = New Point(3, 215)
+        lblOtherInstructions.Name = "lblOtherInstructions"
+        lblOtherInstructions.Size = New Size(105, 15)
+        lblOtherInstructions.TabIndex = 6
+        lblOtherInstructions.Text = "Other Instructions:"
+        ' 
+        ' txtOtherInstructions
+        ' 
+        txtOtherInstructions.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        txtOtherInstructions.Font = New Font("Consolas", 9.0F)
+        txtOtherInstructions.Location = New Point(133, 218)
+        txtOtherInstructions.Multiline = True
+        txtOtherInstructions.Name = "txtOtherInstructions"
+        txtOtherInstructions.ScrollBars = ScrollBars.Vertical
+        txtOtherInstructions.Size = New Size(589, 140)
+        txtOtherInstructions.TabIndex = 7
+        ' 
+        ' grpTemplateManager
+        ' 
+        grpTemplateManager.Controls.Add(tlpTemplateControls)
+        grpTemplateManager.Dock = DockStyle.Top
+        grpTemplateManager.Font = New Font("Segoe UI", 9.75F, FontStyle.Bold)
+        grpTemplateManager.Location = New Point(4, 8)
+        grpTemplateManager.Name = "grpTemplateManager"
+        grpTemplateManager.Padding = New Padding(8)
+        grpTemplateManager.Size = New Size(741, 120)
+        grpTemplateManager.TabIndex = 0
+        grpTemplateManager.TabStop = False
+        grpTemplateManager.Text = "Template Manager"
+        ' 
+        ' tlpTemplateControls
+        ' 
+        tlpTemplateControls.ColumnCount = 4
+        tlpTemplateControls.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 131.0F))
+        tlpTemplateControls.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 76.31579F))
+        tlpTemplateControls.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 12.2291021F))
+        tlpTemplateControls.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 11.4551086F))
+        tlpTemplateControls.Controls.Add(lblTemplateName, 0, 0)
+        tlpTemplateControls.Controls.Add(txtTemplateName, 1, 0)
+        tlpTemplateControls.Controls.Add(btnSaveTemplate, 2, 0)
+        tlpTemplateControls.Controls.Add(lblTemplate, 0, 1)
+        tlpTemplateControls.Controls.Add(cmbTemplate, 1, 1)
+        tlpTemplateControls.Controls.Add(btnLoadTemplate, 2, 1)
+        tlpTemplateControls.Controls.Add(btnCopyTemplate, 3, 1)
+        tlpTemplateControls.Controls.Add(btnUpdateTemplate, 3, 0)
+        tlpTemplateControls.Dock = DockStyle.Fill
+        tlpTemplateControls.Font = New Font("Segoe UI", 9.0F)
+        tlpTemplateControls.Location = New Point(8, 26)
+        tlpTemplateControls.Name = "tlpTemplateControls"
+        tlpTemplateControls.RowCount = 2
+        tlpTemplateControls.RowStyles.Add(New RowStyle(SizeType.Percent, 50.0F))
+        tlpTemplateControls.RowStyles.Add(New RowStyle(SizeType.Percent, 50.0F))
+        tlpTemplateControls.Size = New Size(725, 86)
+        tlpTemplateControls.TabIndex = 0
+        ' 
+        ' lblTemplateName
+        ' 
+        lblTemplateName.Anchor = AnchorStyles.Left Or AnchorStyles.Right
+        lblTemplateName.AutoSize = True
+        lblTemplateName.Location = New Point(3, 14)
+        lblTemplateName.Name = "lblTemplateName"
+        lblTemplateName.Size = New Size(125, 15)
+        lblTemplateName.TabIndex = 0
+        lblTemplateName.Text = "Template Name:"
+        ' 
+        ' txtTemplateName
+        ' 
+        txtTemplateName.Anchor = AnchorStyles.Left Or AnchorStyles.Right
+        txtTemplateName.Location = New Point(134, 10)
+        txtTemplateName.Name = "txtTemplateName"
+        txtTemplateName.Size = New Size(447, 23)
+        txtTemplateName.TabIndex = 1
+        ' 
+        ' btnSaveTemplate
+        ' 
+        btnSaveTemplate.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        btnSaveTemplate.BackColor = Color.FromArgb(CByte(40), CByte(167), CByte(69))
+        btnSaveTemplate.FlatStyle = FlatStyle.Flat
+        btnSaveTemplate.ForeColor = Color.White
+        btnSaveTemplate.Location = New Point(587, 3)
+        btnSaveTemplate.Name = "btnSaveTemplate"
+        btnSaveTemplate.Size = New Size(66, 37)
+        btnSaveTemplate.TabIndex = 2
+        btnSaveTemplate.Text = "Save"
+        btnSaveTemplate.UseVisualStyleBackColor = False
+        ' 
+        ' lblTemplate
+        ' 
+        lblTemplate.Anchor = AnchorStyles.Left Or AnchorStyles.Right
+        lblTemplate.AutoSize = True
+        lblTemplate.Location = New Point(3, 57)
+        lblTemplate.Name = "lblTemplate"
+        lblTemplate.Size = New Size(125, 15)
+        lblTemplate.TabIndex = 3
+        lblTemplate.Text = "Select Template:"
+        ' 
+        ' cmbTemplate
+        ' 
+        cmbTemplate.Anchor = AnchorStyles.Left Or AnchorStyles.Right
+        cmbTemplate.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbTemplate.FormattingEnabled = True
+        cmbTemplate.Location = New Point(134, 53)
+        cmbTemplate.Name = "cmbTemplate"
+        cmbTemplate.Size = New Size(447, 23)
+        cmbTemplate.TabIndex = 4
+        ' 
+        ' btnLoadTemplate
+        ' 
+        btnLoadTemplate.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        btnLoadTemplate.BackColor = Color.FromArgb(CByte(0), CByte(120), CByte(215))
+        btnLoadTemplate.FlatStyle = FlatStyle.Flat
+        btnLoadTemplate.ForeColor = Color.White
+        btnLoadTemplate.Location = New Point(587, 46)
+        btnLoadTemplate.Name = "btnLoadTemplate"
+        btnLoadTemplate.Size = New Size(66, 37)
+        btnLoadTemplate.TabIndex = 5
+        btnLoadTemplate.Text = "Load"
+        btnLoadTemplate.UseVisualStyleBackColor = False
+        ' 
+        ' btnCopyTemplate
+        ' 
+        btnCopyTemplate.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        btnCopyTemplate.BackColor = Color.FromArgb(CByte(108), CByte(117), CByte(125))
+        btnCopyTemplate.FlatStyle = FlatStyle.Flat
+        btnCopyTemplate.ForeColor = Color.White
+        btnCopyTemplate.Location = New Point(659, 46)
+        btnCopyTemplate.Name = "btnCopyTemplate"
+        btnCopyTemplate.Size = New Size(63, 37)
+        btnCopyTemplate.TabIndex = 6
+        btnCopyTemplate.Text = "Copy"
+        btnCopyTemplate.UseVisualStyleBackColor = False
+        ' 
+        ' btnUpdateTemplate
+        ' 
+        btnUpdateTemplate.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        btnUpdateTemplate.BackColor = Color.FromArgb(CByte(255), CByte(193), CByte(7))
+        btnUpdateTemplate.FlatStyle = FlatStyle.Flat
+        btnUpdateTemplate.ForeColor = Color.Black
+        btnUpdateTemplate.Location = New Point(659, 3)
+        btnUpdateTemplate.Name = "btnUpdateTemplate"
+        btnUpdateTemplate.Size = New Size(63, 37)
+        btnUpdateTemplate.TabIndex = 7
+        btnUpdateTemplate.Text = "Update"
+        btnUpdateTemplate.UseVisualStyleBackColor = False
+        ' 
+        ' menuStrip1
+        ' 
+        menuStrip1.Items.AddRange(New ToolStripItem() {fileToolStripMenuItem, settingsToolStripMenuItem, helpToolStripMenuItem})
+        menuStrip1.Location = New Point(0, 0)
+        menuStrip1.Name = "menuStrip1"
+        menuStrip1.Size = New Size(1138, 24)
+        menuStrip1.TabIndex = 1
+        ' 
+        ' fileToolStripMenuItem
+        ' 
+        fileToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {toolStripSeparator1, exitToolStripMenuItem})
+        fileToolStripMenuItem.Name = "fileToolStripMenuItem"
+        fileToolStripMenuItem.Size = New Size(37, 20)
+        fileToolStripMenuItem.Text = "&File"
+        ' 
+        ' toolStripSeparator1
+        ' 
+        toolStripSeparator1.Name = "toolStripSeparator1"
+        toolStripSeparator1.Size = New Size(132, 6)
+        ' 
+        ' exitToolStripMenuItem
+        ' 
+        exitToolStripMenuItem.Name = "exitToolStripMenuItem"
+        exitToolStripMenuItem.ShortcutKeys = Keys.Alt Or Keys.F4
+        exitToolStripMenuItem.Size = New Size(135, 22)
+        exitToolStripMenuItem.Text = "E&xit"
+        ' 
+        ' settingsToolStripMenuItem
+        ' 
+        settingsToolStripMenuItem.Name = "settingsToolStripMenuItem"
+        settingsToolStripMenuItem.Size = New Size(61, 20)
+        settingsToolStripMenuItem.Text = "&Settings"
+        ' 
+        ' helpToolStripMenuItem
+        ' 
+        helpToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {aboutToolStripMenuItem})
+        helpToolStripMenuItem.Name = "helpToolStripMenuItem"
+        helpToolStripMenuItem.Size = New Size(44, 20)
+        helpToolStripMenuItem.Text = "&Help"
+        ' 
+        ' aboutToolStripMenuItem
+        ' 
+        aboutToolStripMenuItem.Name = "aboutToolStripMenuItem"
+        aboutToolStripMenuItem.Size = New Size(107, 22)
+        aboutToolStripMenuItem.Text = "&About"
+        ' 
+        ' statusStrip1
+        ' 
+        statusStrip1.Items.AddRange(New ToolStripItem() {toolStripStatusLabel1, toolStripProgressBar1, toolStripStatusLabelFiles})
+        statusStrip1.Location = New Point(0, 670)
+        statusStrip1.Name = "statusStrip1"
+        statusStrip1.Padding = New Padding(1, 0, 16, 0)
+        statusStrip1.Size = New Size(1138, 22)
+        statusStrip1.TabIndex = 2
+        ' 
+        ' toolStripStatusLabel1
+        ' 
+        toolStripStatusLabel1.Name = "toolStripStatusLabel1"
+        toolStripStatusLabel1.Size = New Size(39, 17)
+        toolStripStatusLabel1.Text = "Ready"
+        ' 
+        ' toolStripProgressBar1
+        ' 
+        toolStripProgressBar1.Name = "toolStripProgressBar1"
+        toolStripProgressBar1.Size = New Size(100, 16)
+        toolStripProgressBar1.Visible = False
+        ' 
+        ' toolStripStatusLabelFiles
+        ' 
+        toolStripStatusLabelFiles.Name = "toolStripStatusLabelFiles"
+        toolStripStatusLabelFiles.Size = New Size(100, 17)
+        toolStripStatusLabelFiles.Text = "Files: 0 | Size: 0 KB"
+        ' 
+        ' folderBrowserDialog1
+        ' 
+        folderBrowserDialog1.Description = "Select project folder"
+        ' 
+        ' openFileDialog1
+        ' 
+        openFileDialog1.Filter = "All Files (*.*)|*.*|VB Files (*.vb)|*.vb|C# Files (*.cs)|*.cs|Web Files (*.html;*.css;*.js)|*.html;*.css;*.js"
+        openFileDialog1.Multiselect = True
+        openFileDialog1.Title = "Select files to add"
+        ' 
+        ' saveFileDialog1
+        ' 
+        saveFileDialog1.Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*"
+        saveFileDialog1.Title = "Save combined files to"
+        ' 
+        ' frmMain
+        ' 
+        AutoScaleDimensions = New SizeF(7.0F, 15.0F)
+        AutoScaleMode = AutoScaleMode.Font
+        BackColor = Color.FromArgb(CByte(248), CByte(249), CByte(250))
+        ClientSize = New Size(1138, 692)
+        Controls.Add(splitContainer1)
+        Controls.Add(statusStrip1)
+        Controls.Add(menuStrip1)
+        Font = New Font("Segoe UI", 9.0F)
+        MainMenuStrip = menuStrip1
+        MinimumSize = New Size(1000, 600)
+        Name = "frmMain"
+        StartPosition = FormStartPosition.CenterScreen
+        Text = "Professional Project File Combiner v2.0"
+        splitContainer1.Panel1.ResumeLayout(False)
+        splitContainer1.Panel2.ResumeLayout(False)
+        CType(splitContainer1, ComponentModel.ISupportInitialize).EndInit()
+        splitContainer1.ResumeLayout(False)
+        leftPanel.ResumeLayout(False)
+        grpFileSelection.ResumeLayout(False)
+        contextMenuStrip1.ResumeLayout(False)
+        pnlTreeActions.ResumeLayout(False)
+        rightPanel.ResumeLayout(False)
+        grpCombineActions.ResumeLayout(False)
+        pnlCombineControls.ResumeLayout(False)
+        pnlCombineControls.PerformLayout()
+        grpProjectSettings.ResumeLayout(False)
+        tlpProjectSettings.ResumeLayout(False)
+        tlpProjectSettings.PerformLayout()
+        grpTemplateManager.ResumeLayout(False)
+        tlpTemplateControls.ResumeLayout(False)
+        tlpTemplateControls.PerformLayout()
+        menuStrip1.ResumeLayout(False)
+        menuStrip1.PerformLayout()
+        statusStrip1.ResumeLayout(False)
+        statusStrip1.PerformLayout()
+        ResumeLayout(False)
+        PerformLayout()
+    End Sub
+
+    ' Control declarations
+    Friend WithEvents splitContainer1 As SplitContainer
+    Friend WithEvents leftPanel As Panel
+    Friend WithEvents rightPanel As Panel
+
+    ' File Selection Group
+    Friend WithEvents grpFileSelection As GroupBox
+    Friend WithEvents treeView1 As TreeView
+    Friend WithEvents contextMenuStrip1 As ContextMenuStrip
+    Friend WithEvents selectFileToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents selectFolderToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents pnlTreeActions As Panel
+    Friend WithEvents btnRefreshTree As Button
+    Friend WithEvents btnExpandAll As Button
+    Friend WithEvents btnCollapseAll As Button
+
+    ' Template Manager Group
+    Friend WithEvents grpTemplateManager As GroupBox
+    Friend WithEvents tlpTemplateControls As TableLayoutPanel
+    Friend WithEvents lblTemplateName As Label
+    Friend WithEvents txtTemplateName As TextBox
+    Friend WithEvents btnSaveTemplate As Button
+    Friend WithEvents lblTemplate As Label
+    Friend WithEvents cmbTemplate As ComboBox
+    Friend WithEvents btnLoadTemplate As Button
+    Friend WithEvents btnCopyTemplate As Button
+    Friend WithEvents btnUpdateTemplate As Button
+
+    ' Project Settings Group
+    Friend WithEvents grpProjectSettings As GroupBox
+    Friend WithEvents tlpProjectSettings As TableLayoutPanel
+    Friend WithEvents lblProjectType As Label
+    Friend WithEvents cmbProjectType As ComboBox
+    Friend WithEvents lblProjectTitle As Label
+    Friend WithEvents txtProjectTitle As TextBox
+    Friend WithEvents lblProjectInstructions As Label
+    Friend WithEvents txtProjectInstructions As TextBox
+    Friend WithEvents lblOtherInstructions As Label
+    Friend WithEvents txtOtherInstructions As TextBox
+
+    ' Combine Actions Group
+    Friend WithEvents grpCombineActions As GroupBox
+    Friend WithEvents pnlCombineControls As Panel
+    Friend WithEvents btnCombine As Button
+    Friend WithEvents lblTokenCount As Label
+    Friend WithEvents progressBar1 As ProgressBar
+
+    ' Menu and Status
+    Friend WithEvents menuStrip1 As MenuStrip
+    Friend WithEvents fileToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents toolStripSeparator1 As ToolStripSeparator
+    Friend WithEvents exitToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents settingsToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents helpToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents aboutToolStripMenuItem As ToolStripMenuItem
+
+    Friend WithEvents statusStrip1 As StatusStrip
+    Friend WithEvents toolStripStatusLabel1 As ToolStripStatusLabel
+    Friend WithEvents toolStripProgressBar1 As ToolStripProgressBar
+    Friend WithEvents toolStripStatusLabelFiles As ToolStripStatusLabel
+
+    ' Dialogs
+    Friend WithEvents folderBrowserDialog1 As FolderBrowserDialog
+    Friend WithEvents openFileDialog1 As OpenFileDialog
+    Friend WithEvents saveFileDialog1 As SaveFileDialog
+
+End Class
+
+==================== FILE: frmMain.vb ====================
+Imports System.IO
+Imports System.Text
+Imports System.Linq
+
+Public Class frmMain
+    Private configFile As String = "config.ini"
+    Private templateFile As String = "template.ini"
+    Private projectFolder As String = ""
+    Private outputFolder As String = ""
+    Private databaseFiles As New List(Of String)
+    Private includeDatabase As Boolean = False
+    Private lastSelectedTemplate As String = ""
+    Private lastSelectedProjectType As String = ""
+    Private projectTitle As String = ""
+    Private projectInstructions As String = ""
+    Private otherInstructions As String = ""
+    Private isUpdatingNodes As Boolean = False
+    Private isLoadingTemplate As Boolean = False
+
+    Private Sub frmMain_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        InitializeApplication()
+    End Sub
+
+    Private Sub InitializeApplication()
+        ' Initialize project types
+        cmbProjectType.Items.AddRange({"Visual Basic Desktop", "Asp MVC 5", "Asp Dotnet Core 8"})
+
+        ' Ensure output folder exists or set default
+        If String.IsNullOrEmpty(outputFolder) Then
+            outputFolder = Path.Combine(Application.StartupPath, "Output")
+        End If
+
+        If Not Directory.Exists(outputFolder) Then
+            Try
+                Directory.CreateDirectory(outputFolder)
+                toolStripStatusLabel1.Text = "Created default output folder: " & outputFolder
+            Catch ex As Exception
+                toolStripStatusLabel1.Text = "Warning: Could not create default output folder"
+            End Try
+        End If
+
+        ' Load configuration and templates
+        LoadConfiguration()
+        LoadTemplates()
+
+        ' Restore last selected project type
+        If Not String.IsNullOrEmpty(lastSelectedProjectType) Then
+            For i As Integer = 0 To cmbProjectType.Items.Count - 1
+                If cmbProjectType.Items(i).ToString().Equals(lastSelectedProjectType, StringComparison.OrdinalIgnoreCase) Then
+                    cmbProjectType.SelectedIndex = i
+                    Exit For
+                End If
+            Next
+        Else
+            cmbProjectType.SelectedIndex = 0
+        End If
+
+        ' Load project folder if configured
+        If Not String.IsNullOrEmpty(projectFolder) AndAlso Directory.Exists(projectFolder) Then
+            LoadProjectFolder()
+        End If
+
+        ' Set initial button states
+        btnLoadTemplate.Enabled = (cmbTemplate.Items.Count > 0 AndAlso cmbTemplate.SelectedItem IsNot Nothing)
+        btnCopyTemplate.Enabled = (cmbTemplate.Items.Count > 0 AndAlso cmbTemplate.SelectedItem IsNot Nothing)
+        btnUpdateTemplate.Enabled = (cmbTemplate.Items.Count > 0 AndAlso cmbTemplate.SelectedItem IsNot Nothing)
+
+        ' Add event handlers for auto-save
+        AddHandler txtProjectTitle.TextChanged, AddressOf ConfigurationChanged
+        AddHandler txtProjectInstructions.TextChanged, AddressOf ConfigurationChanged
+        AddHandler txtOtherInstructions.TextChanged, AddressOf ConfigurationChanged
+
+        ' Set status
+        If String.IsNullOrEmpty(projectFolder) Then
+            toolStripStatusLabel1.Text = "Ready - Select project folder to begin"
+        Else
+            toolStripStatusLabel1.Text = "Ready - Project folder loaded: " & Path.GetFileName(projectFolder)
+        End If
+    End Sub
+
+    ' === NEW EXPAND/COLLAPSE FUNCTIONALITY ===
+    Private Sub btnExpandAll_Click(sender As Object, e As EventArgs) Handles btnExpandAll.Click
+        If treeView1.Nodes.Count = 0 Then
+            toolStripStatusLabel1.Text = "No tree loaded to expand"
+            Return
+        End If
+
+        Try
+            treeView1.BeginUpdate()
+            ExpandAllNodes(treeView1.Nodes)
+            toolStripStatusLabel1.Text = "All tree nodes expanded"
+        Finally
+            treeView1.EndUpdate()
+        End Try
+    End Sub
+
+    Private Sub btnCollapseAll_Click(sender As Object, e As EventArgs) Handles btnCollapseAll.Click
+        If treeView1.Nodes.Count = 0 Then
+            toolStripStatusLabel1.Text = "No tree loaded to collapse"
+            Return
+        End If
+
+        Try
+            treeView1.BeginUpdate()
+            CollapseAllNodes(treeView1.Nodes)
+            toolStripStatusLabel1.Text = "All tree nodes collapsed"
+        Finally
+            treeView1.EndUpdate()
+        End Try
+    End Sub
+
+    Private Sub ExpandAllNodes(nodes As TreeNodeCollection)
+        For Each node As TreeNode In nodes
+            node.Expand()
+            If node.Nodes.Count > 0 Then
+                ExpandAllNodes(node.Nodes)
+            End If
+        Next
+    End Sub
+
+    Private Sub CollapseAllNodes(nodes As TreeNodeCollection)
+        For Each node As TreeNode In nodes
+            node.Collapse()
+            If node.Nodes.Count > 0 Then
+                CollapseAllNodes(node.Nodes)
+            End If
+        Next
+    End Sub
+    ' === END NEW EXPAND/COLLAPSE FUNCTIONALITY ===
+
+    Private Sub ConfigurationChanged(sender As Object, e As EventArgs)
+        ' Auto-save configuration when text boxes change (with delay to avoid constant saving)
+        Static lastSave As DateTime = DateTime.MinValue
+        If DateTime.Now.Subtract(lastSave).TotalSeconds > 2 Then
+            SaveConfiguration()
+            lastSave = DateTime.Now
+        End If
+    End Sub
+
+    Private Sub LoadConfiguration()
+        If Not File.Exists(configFile) Then
+            CreateDefaultConfigFile()
+        End If
+
+        If File.Exists(configFile) Then
+            Dim lines() As String = File.ReadAllLines(configFile)
+            databaseFiles.Clear() ' Clear existing list
+
+            For Each line In lines
+                If line.StartsWith("ProjectFolder=") Then
+                    Dim newProjectFolder As String = line.Substring("ProjectFolder=".Length).Trim()
+                    If Not String.IsNullOrEmpty(newProjectFolder) AndAlso Directory.Exists(newProjectFolder) Then
+                        projectFolder = newProjectFolder
+                    End If
+                ElseIf line.StartsWith("OutputFolder=") Then
+                    outputFolder = line.Substring("OutputFolder=".Length).Trim()
+                ElseIf line.StartsWith("DatabaseFile=") Then
+                    ' Support multiple database files
+                    Dim dbFile As String = line.Substring("DatabaseFile=".Length).Trim()
+                    If Not String.IsNullOrEmpty(dbFile) AndAlso File.Exists(dbFile) Then
+                        databaseFiles.Add(dbFile)
+                    End If
+                ElseIf line.StartsWith("IncludeDatabase=") Then
+                    Boolean.TryParse(line.Substring("IncludeDatabase=".Length).Trim(), includeDatabase)
+                ElseIf line.StartsWith("LastSelectedTemplate=") Then
+                    lastSelectedTemplate = line.Substring("LastSelectedTemplate=".Length).Trim()
+                ElseIf line.StartsWith("LastSelectedProjectType=") Then
+                    lastSelectedProjectType = line.Substring("LastSelectedProjectType=".Length).Trim()
+                ElseIf line.StartsWith("ProjectTitle=") Then
+                    projectTitle = line.Substring("ProjectTitle=".Length).Trim()
+                    txtProjectTitle.Text = projectTitle
+                ElseIf line.StartsWith("ProjectInstructions=") Then
+                    projectInstructions = line.Substring("ProjectInstructions=".Length).Replace("\n", vbCrLf)
+                    txtProjectInstructions.Text = projectInstructions
+                ElseIf line.StartsWith("OtherInstructions=") Then
+                    otherInstructions = line.Substring("OtherInstructions=".Length).Replace("\n", vbCrLf)
+                    txtOtherInstructions.Text = otherInstructions
+                End If
+            Next
+        End If
+    End Sub
+
+    Private Sub CreateDefaultConfigFile()
+        Try
+            Dim defaultConfig As New StringBuilder()
+            defaultConfig.AppendLine("# Project File Combiner Configuration")
+            defaultConfig.AppendLine("# This file stores application settings")
+            defaultConfig.AppendLine("")
+            defaultConfig.AppendLine("# Main project folder path")
+            defaultConfig.AppendLine("ProjectFolder=")
+            defaultConfig.AppendLine("")
+            defaultConfig.AppendLine("# Output folder for combined files")
+            defaultConfig.AppendLine("OutputFolder=")
+            defaultConfig.AppendLine("")
+            defaultConfig.AppendLine("# Database settings - multiple SQL files supported")
+            defaultConfig.AppendLine("IncludeDatabase=False")
+            defaultConfig.AppendLine("")
+            defaultConfig.AppendLine("# Last selected template and project type")
+            defaultConfig.AppendLine("LastSelectedTemplate=")
+            defaultConfig.AppendLine("LastSelectedProjectType=")
+            defaultConfig.AppendLine("")
+            defaultConfig.AppendLine("# Project information")
+            defaultConfig.AppendLine("ProjectTitle=")
+            defaultConfig.AppendLine("ProjectInstructions=")
+            defaultConfig.AppendLine("OtherInstructions=")
+
+            File.WriteAllText(configFile, defaultConfig.ToString())
+            toolStripStatusLabel1.Text = "Created default config.ini file"
+        Catch ex As Exception
+            toolStripStatusLabel1.Text = "Error creating config file: " & ex.Message
+        End Try
+    End Sub
+
+    Private Sub SaveConfiguration()
+        Try
+            Dim config As New StringBuilder()
+            config.AppendLine("# Project File Combiner Configuration")
+            config.AppendLine("# This file stores application settings")
+            config.AppendLine("")
+            config.AppendLine("# Main project folder path")
+            config.AppendLine("ProjectFolder=" & projectFolder)
+            config.AppendLine("")
+            config.AppendLine("# Output folder for combined files")
+            config.AppendLine("OutputFolder=" & outputFolder)
+            config.AppendLine("")
+            config.AppendLine("# Database settings - multiple SQL files supported")
+            For Each dbFile In databaseFiles
+                config.AppendLine("DatabaseFile=" & dbFile)
+            Next
+            config.AppendLine("IncludeDatabase=" & includeDatabase.ToString())
+            config.AppendLine("")
+            config.AppendLine("# Last selected template and project type")
+            config.AppendLine("LastSelectedTemplate=" & If(cmbTemplate.SelectedItem?.ToString(), ""))
+            config.AppendLine("LastSelectedProjectType=" & If(cmbProjectType.SelectedItem?.ToString(), ""))
+            config.AppendLine("")
+            config.AppendLine("# Project information")
+            config.AppendLine("ProjectTitle=" & txtProjectTitle.Text.Trim())
+            config.AppendLine("ProjectInstructions=" & txtProjectInstructions.Text.Replace(vbCrLf, "\n"))
+            config.AppendLine("OtherInstructions=" & txtOtherInstructions.Text.Replace(vbCrLf, "\n"))
+
+            File.WriteAllText(configFile, config.ToString())
+
+            ' Optional: Show debug info in status (remove in production)
+            ' toolStripStatusLabel1.Text = "Configuration saved successfully"
+
+        Catch ex As Exception
+            toolStripStatusLabel1.Text = "Error saving configuration: " & ex.Message
+        End Try
+    End Sub
+
+    Private Sub LoadTemplates()
+        ' Store current selection before clearing
+        Dim currentSelection As String = ""
+        If cmbTemplate.SelectedItem IsNot Nothing Then
+            currentSelection = cmbTemplate.SelectedItem.ToString()
+        End If
+
+        cmbTemplate.Items.Clear()
+
+        If Not File.Exists(templateFile) Then
+            CreateDefaultTemplateFile()
+        End If
+
+        If File.Exists(templateFile) Then
+            Try
+                Dim content As String = File.ReadAllText(templateFile)
+
+                ' Skip if file is empty or only contains comments
+                If String.IsNullOrWhiteSpace(content) OrElse Not content.Contains("[TEMPLATE]") Then
+                    Return
+                End If
+
+                ' Split by [TEMPLATE] sections
+                Dim sections() As String = content.Split(New String() {"[TEMPLATE]"}, StringSplitOptions.RemoveEmptyEntries)
+
+                For Each section In sections
+                    If Not String.IsNullOrWhiteSpace(section) Then
+                        ' Split section into lines
+                        Dim lines() As String = section.Split({vbCrLf, vbLf, vbCr}, StringSplitOptions.RemoveEmptyEntries)
+
+                        For Each line In lines
+                            Dim trimmedLine As String = line.Trim()
+                            ' Skip comments and empty lines
+                            If Not String.IsNullOrWhiteSpace(trimmedLine) AndAlso Not trimmedLine.StartsWith("#") Then
+                                If trimmedLine.StartsWith("Name=") Then
+                                    Dim templateName As String = trimmedLine.Substring("Name=".Length).Trim()
+                                    If Not String.IsNullOrWhiteSpace(templateName) Then
+                                        cmbTemplate.Items.Add(templateName)
+                                        Exit For ' Found the name, move to next section
+                                    End If
+                                End If
+                            End If
+                        Next
+                    End If
+                Next
+
+                ' Restore previous selection if it exists
+                If Not String.IsNullOrEmpty(currentSelection) Then
+                    For i As Integer = 0 To cmbTemplate.Items.Count - 1
+                        If cmbTemplate.Items(i).ToString().Equals(currentSelection, StringComparison.OrdinalIgnoreCase) Then
+                            cmbTemplate.SelectedIndex = i
+                            Return
+                        End If
+                    Next
+                End If
+
+                ' Try to restore last selected template from config
+                If Not String.IsNullOrEmpty(lastSelectedTemplate) Then
+                    For i As Integer = 0 To cmbTemplate.Items.Count - 1
+                        If cmbTemplate.Items(i).ToString().Equals(lastSelectedTemplate, StringComparison.OrdinalIgnoreCase) Then
+                            cmbTemplate.SelectedIndex = i
+                            Return
+                        End If
+                    Next
+                End If
+
+                ' If no previous selection found, select first template if available
+                If cmbTemplate.Items.Count > 0 Then
+                    cmbTemplate.SelectedIndex = 0
+                End If
+
+            Catch ex As Exception
+                toolStripStatusLabel1.Text = "Error loading templates: " & ex.Message
+            End Try
+        End If
+    End Sub
+
+    Private Sub CreateDefaultTemplateFile()
+        Try
+            Dim defaultTemplate As New StringBuilder()
+            defaultTemplate.AppendLine("# Project File Combiner Templates")
+            defaultTemplate.AppendLine("# This file stores saved file selection templates")
+            defaultTemplate.AppendLine("# Format:")
+            defaultTemplate.AppendLine("# [TEMPLATE]")
+            defaultTemplate.AppendLine("# Name=TemplateName")
+            defaultTemplate.AppendLine("# File=C:\Path\To\File1.ext")
+            defaultTemplate.AppendLine("# File=C:\Path\To\File2.ext")
+            defaultTemplate.AppendLine("")
+
+            File.WriteAllText(templateFile, defaultTemplate.ToString())
+        Catch ex As Exception
+            toolStripStatusLabel1.Text = "Error creating template file: " & ex.Message
+        End Try
+    End Sub
+
+    Private Sub LoadProjectFolder()
+        If Directory.Exists(projectFolder) Then
+            treeView1.Nodes.Clear()
+            treeView1.BeginUpdate() ' Prevent flickering during load
+
+            Try
+                Dim rootNode As TreeNode = New TreeNode(Path.GetFileName(projectFolder))
+                rootNode.Tag = projectFolder
+                rootNode.ImageIndex = 0 ' Folder icon
+                treeView1.Nodes.Add(rootNode)
+                LoadDirectoryNodes(rootNode, projectFolder)
+
+                toolStripStatusLabel1.Text = "Project folder loaded: " & projectFolder & " (" & CountTotalNodes(rootNode) & " items) - Tree collapsed"
+            Catch ex As Exception
+                toolStripStatusLabel1.Text = "Error loading project folder: " & ex.Message
+            Finally
+                treeView1.EndUpdate()
+            End Try
+        Else
+            treeView1.Nodes.Clear()
+            toolStripStatusLabel1.Text = "Project folder not found: " & projectFolder
+        End If
+    End Sub
+
+    Private Function CountTotalNodes(parentNode As TreeNode) As Integer
+        Dim count As Integer = parentNode.Nodes.Count
+        For Each childNode As TreeNode In parentNode.Nodes
+            count += CountTotalNodes(childNode)
+        Next
+        Return count
+    End Function
+
+    Private Sub LoadDirectoryNodes(parentNode As TreeNode, directoryPath As String)
+        Try
+            ' Add directories
+            Dim directories() As String = Directory.GetDirectories(directoryPath)
+            For Each directory As String In directories
+                Dim dirNode As TreeNode = New TreeNode(Path.GetFileName(directory))
+                dirNode.Tag = directory
+                parentNode.Nodes.Add(dirNode)
+                LoadDirectoryNodes(dirNode, directory)
+            Next
+
+            ' Add files
+            Dim files() As String = Directory.GetFiles(directoryPath)
+            For Each file As String In files
+                Dim fileNode As TreeNode = New TreeNode(Path.GetFileName(file))
+                fileNode.Tag = file
+                parentNode.Nodes.Add(fileNode)
+            Next
+        Catch ex As UnauthorizedAccessException
+            ' Skip directories we can't access
+        End Try
+    End Sub
+
+    Private Sub selectProjectFolderToolStripMenuItem_Click(sender As Object, e As EventArgs)
+        folderBrowserDialog1.Description = "Select Project Folder"
+        folderBrowserDialog1.ShowNewFolderButton = True
+
+        If Not String.IsNullOrEmpty(projectFolder) AndAlso Directory.Exists(projectFolder) Then
+            folderBrowserDialog1.SelectedPath = projectFolder
+        End If
+
+        If folderBrowserDialog1.ShowDialog = DialogResult.OK Then
+            projectFolder = folderBrowserDialog1.SelectedPath
+            LoadProjectFolder()
+            SaveConfiguration()
+
+            ' Refresh templates after changing project folder
+            RefreshTreeView()
+        End If
+    End Sub
+
+    Private Sub RefreshTreeView()
+        If Not String.IsNullOrEmpty(projectFolder) AndAlso Directory.Exists(projectFolder) Then
+            ' Store currently checked files and expansion state
+            Dim checkedFiles As List(Of String) = GetCheckedFiles()
+            Dim treeState As Dictionary(Of String, Boolean) = GetTreeExpansionState()
+
+            ' Reload tree
+            LoadProjectFolder()
+
+            ' Restore checked state and expansion state
+            If checkedFiles.Count > 0 OrElse treeState.Count > 0 Then
+                isUpdatingNodes = True
+                Try
+                    ' Restore checked files
+                    For Each filePath In checkedFiles
+                        If File.Exists(filePath) Then
+                            SelectFileInTree(filePath)
+                        End If
+                    Next
+
+                    ' Restore expansion state (or keep collapsed if no previous state)
+                    If treeState.Count > 0 Then
+                        RestoreTreeExpansionState(treeState)
+                    End If
+                Finally
+                    isUpdatingNodes = False
+                End Try
+                UpdateTokenCount()
+            End If
+        End If
+    End Sub
+
+    Private Sub refreshTreeViewToolStripMenuItem_Click(sender As Object, e As EventArgs)
+        If String.IsNullOrEmpty(projectFolder) Then
+            toolStripStatusLabel1.Text = "Error: Please select a project folder first"
+            Return
+        End If
+
+        RefreshTreeView()
+        toolStripStatusLabel1.Text = "Tree view refreshed successfully"
+    End Sub
+
+
+    Private Sub outputFolderToolStripMenuItem_Click(sender As Object, e As EventArgs)
+        If folderBrowserDialog1.ShowDialog = DialogResult.OK Then
+            outputFolder = folderBrowserDialog1.SelectedPath
+            SaveConfiguration()
+            toolStripStatusLabel1.Text = "Output folder set: " & outputFolder
+        End If
+    End Sub
+
+    Private Sub exitToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles exitToolStripMenuItem.Click
+        Application.Exit()
+    End Sub
+
+    Private Sub selectFileToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles selectFileToolStripMenuItem.Click
+        If openFileDialog1.ShowDialog() = DialogResult.OK Then
+            Dim selectedCount As Integer = 0
+            For Each fileName In openFileDialog1.FileNames
+                SelectFileInTree(fileName)
+                selectedCount += 1
+            Next
+            toolStripStatusLabel1.Text = $"Selected {selectedCount} files from dialog"
+        End If
+    End Sub
+
+    Private Sub selectFolderToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles selectFolderToolStripMenuItem.Click
+        If folderBrowserDialog1.ShowDialog() = DialogResult.OK Then
+            SelectFolderInTree(folderBrowserDialog1.SelectedPath)
+            toolStripStatusLabel1.Text = "Selected folder: " & Path.GetFileName(folderBrowserDialog1.SelectedPath)
+        End If
+    End Sub
+
+    Private Sub SelectFileInTree(filePath As String)
+        If String.IsNullOrEmpty(filePath) Then Return
+
+        isUpdatingNodes = True
+        Try
+            Dim node As TreeNode = FindNodeByPath(treeView1.Nodes, filePath)
+            If node IsNot Nothing Then
+                node.Checked = True
+                ' Ensure parent nodes are expanded and visible
+                EnsureNodeVisible(node)
+                ' Update parent folder states
+                UpdateParentNodeCheck(node)
+            Else
+                ' If node not found, try to refresh tree and find again
+                If Not String.IsNullOrEmpty(projectFolder) AndAlso filePath.StartsWith(projectFolder, StringComparison.OrdinalIgnoreCase) Then
+                    ' File should be in our project tree, but node wasn't found
+                    ' This might happen if tree is not fully loaded
+                    RefreshAndSelectFile(filePath)
+                End If
+            End If
+        Finally
+            isUpdatingNodes = False
+        End Try
+    End Sub
+
+    Private Sub RefreshAndSelectFile(filePath As String)
+        ' This method refreshes the tree and then tries to select the file
+        If File.Exists(filePath) OrElse Directory.Exists(filePath) Then
+            ' Store current selections
+            Dim currentSelections As List(Of String) = GetCheckedFiles()
+
+            ' Reload tree structure
+            LoadProjectFolder()
+
+            ' Restore all previous selections plus the new one
+            isUpdatingNodes = True
+            Try
+                For Each selectedFile In currentSelections
+                    Dim node As TreeNode = FindNodeByPath(treeView1.Nodes, selectedFile)
+                    If node IsNot Nothing Then
+                        node.Checked = True
+                    End If
+                Next
+
+                ' Now try to select the target file again
+                Dim targetNode As TreeNode = FindNodeByPath(treeView1.Nodes, filePath)
+                If targetNode IsNot Nothing Then
+                    targetNode.Checked = True
+                    EnsureNodeVisible(targetNode)
+                End If
+            Finally
+                isUpdatingNodes = False
+            End Try
+        End If
+    End Sub
+
+    Private Sub EnsureNodeVisible(node As TreeNode)
+        ' Only expand parent nodes if they are already expanded or if the node is directly checked
+        ' Don't auto-expand during template loading to keep tree collapsed
+        If Not isLoadingTemplate Then
+            Dim parentNode As TreeNode = node.Parent
+            While parentNode IsNot Nothing
+                ' Only expand if parent was already expanded
+                If parentNode.IsExpanded Then
+                    parentNode.Expand()
+                End If
+                parentNode = parentNode.Parent
+            End While
+        End If
+
+        ' Ensure the node itself is visible (scroll to it) but don't force expansion
+        Try
+            node.EnsureVisible()
+        Catch
+            ' Ignore if node can't be made visible
+        End Try
+    End Sub
+
+    Private Sub SelectFolderInTree(folderPath As String)
+        isUpdatingNodes = True
+        Try
+            Dim node As TreeNode = FindNodeByPath(treeView1.Nodes, folderPath)
+            If node IsNot Nothing Then
+                CheckAllChildNodes(node, True)
+                node.Checked = True
+            End If
+        Finally
+            isUpdatingNodes = False
+        End Try
+    End Sub
+
+    Private Function FindNodeByPath(nodes As TreeNodeCollection, path As String) As TreeNode
+        For Each node As TreeNode In nodes
+            If node.Tag IsNot Nothing Then
+                Dim nodePath As String = node.Tag.ToString()
+                ' Use case-insensitive comparison for Windows file paths
+                If String.Equals(nodePath, path, StringComparison.OrdinalIgnoreCase) Then
+                    Return node
+                End If
+            End If
+
+            ' Recursively search child nodes
+            Dim childNode As TreeNode = FindNodeByPath(node.Nodes, path)
+            If childNode IsNot Nothing Then
+                Return childNode
+            End If
+        Next
+        Return Nothing
+    End Function
+
+    Private Sub CheckAllChildNodes(parentNode As TreeNode, isChecked As Boolean)
+        ' Don't trigger events while updating
+        For Each childNode As TreeNode In parentNode.Nodes
+            childNode.Checked = isChecked
+            If childNode.Nodes.Count > 0 Then
+                CheckAllChildNodes(childNode, isChecked)
+            End If
+        Next
+    End Sub
+
+    Private Sub treeView1_AfterCheck(sender As Object, e As TreeViewEventArgs) Handles treeView1.AfterCheck
+        If isUpdatingNodes Then Return
+
+        isUpdatingNodes = True
+        Try
+            ' When a folder is checked, check all children
+            If e.Node.Nodes.Count > 0 Then
+                CheckAllChildNodes(e.Node, e.Node.Checked)
+            End If
+
+            ' Update parent nodes based on children
+            UpdateParentNodeCheck(e.Node)
+
+            ' Update token count
+            UpdateTokenCount()
+        Finally
+            isUpdatingNodes = False
+        End Try
+    End Sub
+
+    Private Sub UpdateParentNodeCheck(node As TreeNode)
+        If node.Parent IsNot Nothing Then
+            Dim checkedCount As Integer = 0
+            Dim totalCount As Integer = node.Parent.Nodes.Count
+
+            For Each sibling As TreeNode In node.Parent.Nodes
+                If sibling.Checked Then checkedCount += 1
+            Next
+
+            ' Set parent as checked if any children are checked
+            node.Parent.Checked = checkedCount > 0
+
+            ' Recursively update grandparent
+            UpdateParentNodeCheck(node.Parent)
+        End If
+    End Sub
+
+    Private Sub UpdateTokenCount()
+        Dim checkedFiles As List(Of String) = GetCheckedFiles()
+
+        If String.IsNullOrEmpty(projectFolder) OrElse String.IsNullOrEmpty(outputFolder) Then
+            lblTokenCount.Text = "Token Count: 0"
+            Return
+        End If
+
+        If cmbProjectType.SelectedItem Is Nothing Then
+            lblTokenCount.Text = "Token Count: 0"
+            Return
+        End If
+
+        Try
+            Dim combiner As New FileCombiner(projectFolder, outputFolder)
+            Dim tokenCount As Integer = combiner.EstimateTokenCount(checkedFiles, cmbProjectType.SelectedItem.ToString())
+            lblTokenCount.Text = "Token Count: " & tokenCount.ToString("N0")
+        Catch ex As Exception
+            lblTokenCount.Text = "Token Count: Error"
+        End Try
+    End Sub
+
+    Private Sub btnSaveTemplate_Click(sender As Object, e As EventArgs) Handles btnSaveTemplate.Click
+        If String.IsNullOrWhiteSpace(txtTemplateName.Text) Then
+            toolStripStatusLabel1.Text = "Error: Please enter a template name"
+            Return
+        End If
+
+        Dim checkedFiles As List(Of String) = GetCheckedFiles()
+        If checkedFiles.Count = 0 Then
+            toolStripStatusLabel1.Text = "Error: Please select at least one file before saving template"
+            Return
+        End If
+
+        Try
+            SaveCurrentTemplate(txtTemplateName.Text.Trim())
+            LoadTemplates() ' Refresh the template list
+
+            ' Select the newly saved template
+            For i As Integer = 0 To cmbTemplate.Items.Count - 1
+                If cmbTemplate.Items(i).ToString().Equals(txtTemplateName.Text.Trim(), StringComparison.OrdinalIgnoreCase) Then
+                    cmbTemplate.SelectedIndex = i
+                    Exit For
+                End If
+            Next
+
+            txtTemplateName.Clear()
+            toolStripStatusLabel1.Text = "Template saved successfully with " & checkedFiles.Count & " files"
+        Catch ex As Exception
+            toolStripStatusLabel1.Text = "Error saving template: " & ex.Message
+        End Try
+    End Sub
+
+    Private Sub btnUpdateTemplate_Click(sender As Object, e As EventArgs) Handles btnUpdateTemplate.Click
+        If cmbTemplate.SelectedItem Is Nothing Then
+            toolStripStatusLabel1.Text = "Error: Please select a template to update"
+            Return
+        End If
+
+        Dim checkedFiles As List(Of String) = GetCheckedFiles()
+        If checkedFiles.Count = 0 Then
+            toolStripStatusLabel1.Text = "Error: Please select at least one file before updating template"
+            Return
+        End If
+
+        ' Show progress bar and disable button
+        progressBar1.Visible = True
+        progressBar1.Minimum = 0
+        progressBar1.Maximum = 100
+        progressBar1.Value = 0
+        btnUpdateTemplate.Enabled = False
+        btnUpdateTemplate.Text = "Updating..."
+
+        Try
+            Dim templateName As String = cmbTemplate.SelectedItem.ToString()
+
+            ' Step 1: Initialize (10%)
+            UpdateProgress(10, "Initializing template update...")
+            Application.DoEvents()
+
+            ' Step 2: Store tree expansion state (20%)
+            UpdateProgress(20, "Storing tree expansion state...")
+            Application.DoEvents()
+            Dim treeState As Dictionary(Of String, Boolean) = GetTreeExpansionState()
+
+            ' Step 3: Delete old template (40%)
+            UpdateProgress(40, "Removing old template version...")
+            Application.DoEvents()
+            DeleteTemplate(templateName)
+
+            ' Step 4: Save new template (60%)
+            UpdateProgress(60, "Saving updated template...")
+            Application.DoEvents()
+            SaveCurrentTemplate(templateName)
+
+            ' Step 5: Refresh template list (80%)
+            UpdateProgress(80, "Refreshing template list...")
+            Application.DoEvents()
+            LoadTemplates()
+
+            ' Step 6: Restore tree state (90%)
+            UpdateProgress(90, "Restoring tree expansion state...")
+            Application.DoEvents()
+            RestoreTreeExpansionState(treeState)
+
+            ' Step 7: Complete (100%)
+            UpdateProgress(100, "Template update complete!")
+            Application.DoEvents()
+
+            toolStripStatusLabel1.Text = "Template '" & templateName & "' updated with " & checkedFiles.Count & " files"
+
+            ' Small delay to show completion
+            System.Threading.Thread.Sleep(300)
+
+        Catch ex As Exception
+            toolStripStatusLabel1.Text = "Error updating template: " & ex.Message
+        Finally
+            ' Hide progress bar and restore button
+            progressBar1.Visible = False
+            btnUpdateTemplate.Enabled = True
+            btnUpdateTemplate.Text = "Update"
+        End Try
+    End Sub
+
+    Private Function GetTreeExpansionState() As Dictionary(Of String, Boolean)
+        Dim state As New Dictionary(Of String, Boolean)
+        CollectTreeExpansionState(treeView1.Nodes, state)
+        Return state
+    End Function
+
+    Private Sub CollectTreeExpansionState(nodes As TreeNodeCollection, state As Dictionary(Of String, Boolean))
+        For Each node As TreeNode In nodes
+            If node.Tag IsNot Nothing Then
+                Dim path As String = node.Tag.ToString()
+                state(path) = node.IsExpanded
+                If node.Nodes.Count > 0 Then
+                    CollectTreeExpansionState(node.Nodes, state)
+                End If
+            End If
+        Next
+    End Sub
+
+    Private Sub RestoreTreeExpansionState(state As Dictionary(Of String, Boolean))
+        RestoreNodeExpansionState(treeView1.Nodes, state)
+    End Sub
+
+    Private Sub RestoreNodeExpansionState(nodes As TreeNodeCollection, state As Dictionary(Of String, Boolean))
+        For Each node As TreeNode In nodes
+            If node.Tag IsNot Nothing Then
+                Dim path As String = node.Tag.ToString()
+                If state.ContainsKey(path) Then
+                    If state(path) Then
+                        node.Expand()
+                    Else
+                        node.Collapse()
+                    End If
+                End If
+                If node.Nodes.Count > 0 Then
+                    RestoreNodeExpansionState(node.Nodes, state)
+                End If
+            End If
+        Next
+    End Sub
+
+    Private Sub DeleteTemplate(templateName As String)
+        If Not File.Exists(templateFile) Then Return
+
+        Try
+            Dim content As String = File.ReadAllText(templateFile)
+            Dim sections() As String = content.Split(New String() {"[TEMPLATE]"}, StringSplitOptions.RemoveEmptyEntries)
+            Dim newContent As New StringBuilder()
+
+            For Each section In sections
+                If Not String.IsNullOrWhiteSpace(section) Then
+                    Dim lines() As String = section.Split({vbCrLf, vbLf, vbCr}, StringSplitOptions.RemoveEmptyEntries)
+                    Dim isTargetTemplate As Boolean = False
+
+                    ' Check if this is the template to delete
+                    For Each line In lines
+                        Dim trimmedLine As String = line.Trim()
+                        If Not String.IsNullOrWhiteSpace(trimmedLine) AndAlso Not trimmedLine.StartsWith("#") Then
+                            If trimmedLine.StartsWith("Name=") Then
+                                Dim currentTemplateName As String = trimmedLine.Substring("Name=".Length).Trim()
+                                If currentTemplateName.Equals(templateName, StringComparison.OrdinalIgnoreCase) Then
+                                    isTargetTemplate = True
+                                End If
+                                Exit For
+                            End If
+                        End If
+                    Next
+
+                    ' If this is not the template to delete, keep it
+                    If Not isTargetTemplate Then
+                        newContent.AppendLine("[TEMPLATE]")
+                        newContent.Append(section)
+                        If Not section.EndsWith(vbCrLf) Then
+                            newContent.AppendLine()
+                        End If
+                    End If
+                End If
+            Next
+
+            File.WriteAllText(templateFile, newContent.ToString())
+        Catch ex As Exception
+            Throw New Exception("Error deleting template: " & ex.Message)
+        End Try
+    End Sub
+
+    Private Sub SaveCurrentTemplate(templateName As String)
+        Dim checkedFiles As List(Of String) = GetCheckedFiles()
+
+        ' Read existing templates and rebuild without the one we're saving
+        Dim newContent As New StringBuilder()
+        If File.Exists(templateFile) Then
+            Dim existingContent As String = File.ReadAllText(templateFile)
+            If Not String.IsNullOrWhiteSpace(existingContent) AndAlso existingContent.Contains("[TEMPLATE]") Then
+                Dim sections() As String = existingContent.Split(New String() {"[TEMPLATE]"}, StringSplitOptions.RemoveEmptyEntries)
+
+                For Each section In sections
+                    If Not String.IsNullOrWhiteSpace(section) Then
+                        Dim lines() As String = section.Split({vbCrLf, vbLf, vbCr}, StringSplitOptions.RemoveEmptyEntries)
+                        Dim sectionTemplateName As String = ""
+
+                        ' Find the template name in this section
+                        For Each line In lines
+                            Dim trimmedLine As String = line.Trim()
+                            If Not String.IsNullOrWhiteSpace(trimmedLine) AndAlso Not trimmedLine.StartsWith("#") Then
+                                If trimmedLine.StartsWith("Name=") Then
+                                    sectionTemplateName = trimmedLine.Substring("Name=".Length).Trim()
+                                    Exit For
+                                End If
+                            End If
+                        Next
+
+                        ' Only keep sections that don't match the template we're saving
+                        If Not sectionTemplateName.Equals(templateName, StringComparison.OrdinalIgnoreCase) Then
+                            newContent.AppendLine("[TEMPLATE]")
+                            newContent.Append(section)
+                            If Not section.EndsWith(vbCrLf) Then
+                                newContent.AppendLine()
+                            End If
+                        End If
+                    End If
+                Next
+            End If
+        End If
+
+        ' Add the new/updated template
+        newContent.AppendLine("[TEMPLATE]")
+        newContent.AppendLine("Name=" & templateName)
+        For Each filePath In checkedFiles
+            newContent.AppendLine("File=" & filePath)
+        Next
+        newContent.AppendLine() ' Add blank line after template
+
+        File.WriteAllText(templateFile, newContent.ToString())
+    End Sub
+
+    Private Sub btnCopyTemplate_Click(sender As Object, e As EventArgs) Handles btnCopyTemplate.Click
+        If cmbTemplate.SelectedItem Is Nothing Then
+            toolStripStatusLabel1.Text = "Error: Please select a template to copy"
+            Return
+        End If
+
+        Try
+            Dim selectedTemplate As String = cmbTemplate.SelectedItem.ToString()
+
+            ' Copy template name to text box for creating a new template
+            txtTemplateName.Text = selectedTemplate & "_Copy"
+            txtTemplateName.SelectAll()
+            txtTemplateName.Focus()
+
+            toolStripStatusLabel1.Text = "Template copied - enter new name in text box and click Save to create copy"
+        Catch ex As Exception
+            toolStripStatusLabel1.Text = "Error copying template: " & ex.Message
+        End Try
+    End Sub
+
+    Private Sub btnLoadTemplate_Click(sender As Object, e As EventArgs) Handles btnLoadTemplate.Click
+        If cmbTemplate.SelectedItem Is Nothing Then
+            toolStripStatusLabel1.Text = "Error: Please select a template to load"
+            Return
+        End If
+
+        ' Ensure we have a project folder and tree loaded
+        If String.IsNullOrEmpty(projectFolder) Then
+            toolStripStatusLabel1.Text = "Error: Please select a project folder first using File > Select Project Folder"
+            Return
+        End If
+
+        ' Show progress bar and disable button
+        progressBar1.Visible = True
+        progressBar1.Minimum = 0
+        progressBar1.Maximum = 100
+        progressBar1.Value = 0
+        btnLoadTemplate.Enabled = False
+        btnLoadTemplate.Text = "Loading..."
+
+        Try
+            ' Step 1: Initialize (10%)
+            UpdateProgress(10, "Initializing template loading...")
+            Application.DoEvents()
+
+            ' Step 2: Ensure tree is loaded (20%)
+            UpdateProgress(20, "Ensuring tree is loaded...")
+            Application.DoEvents()
+            EnsureTreeLoaded()
+
+            ' Step 3: Start loading template (30%)
+            UpdateProgress(30, "Reading template file...")
+            Application.DoEvents()
+
+            Dim selectedTemplate = cmbTemplate.SelectedItem.ToString
+
+            ' Step 4: Clear current selections (40%)
+            UpdateProgress(40, "Clearing current selections...")
+            Application.DoEvents()
+
+            ' Step 5: Load template with progress (40% - 90%)
+            UpdateProgress(50, "Loading template: " & selectedTemplate)
+            Application.DoEvents()
+
+            ' Set flag to show detailed status for manual loading
+            isLoadingTemplate = False
+            LoadTemplateWithProgress(selectedTemplate)
+
+            ' Step 6: Finalizing (95%)
+            UpdateProgress(95, "Finalizing template load...")
+            Application.DoEvents()
+
+            ' Count loaded files
+            Dim loadedFiles = GetCheckedFiles()
+
+            ' Step 7: Complete (100%)
+            UpdateProgress(100, "Template loaded successfully!")
+            Application.DoEvents()
+
+            toolStripStatusLabel1.Text = "Template '" & selectedTemplate & "' loaded manually - " & loadedFiles.Count & " files selected"
+
+            ' Small delay to show completion
+            System.Threading.Thread.Sleep(300)
+
+        Catch ex As Exception
+            toolStripStatusLabel1.Text = "Error loading template: " & ex.Message
+        Finally
+            ' Hide progress bar and restore button
+            progressBar1.Visible = False
+            btnLoadTemplate.Enabled = True
+            btnLoadTemplate.Text = "Load"
+        End Try
+    End Sub
+
+    Private Sub EnsureTreeLoaded()
+        ' Make sure the tree view is loaded with current project folder
+        If Not String.IsNullOrEmpty(projectFolder) AndAlso Directory.Exists(projectFolder) Then
+            If treeView1.Nodes.Count = 0 Then
+                LoadProjectFolder()
+            Else
+                ' Check if the root node matches current project folder
+                If treeView1.Nodes.Count > 0 AndAlso treeView1.Nodes(0).Tag IsNot Nothing Then
+                    Dim rootPath As String = treeView1.Nodes(0).Tag.ToString()
+                    If Not String.Equals(rootPath, projectFolder, StringComparison.OrdinalIgnoreCase) Then
+                        ' Store expansion state before reloading
+                        Dim treeState As Dictionary(Of String, Boolean) = GetTreeExpansionState()
+                        LoadProjectFolder() ' Reload if path changed
+                        ' Restore expansion state if there was any
+                        If treeState.Count > 0 Then
+                            RestoreTreeExpansionState(treeState)
+                        End If
+                    End If
+                Else
+                    LoadProjectFolder() ' Reload if root node is invalid
+                End If
+            End If
+        End If
+    End Sub
+
+    Private Sub LoadTemplateWithProgress(templateName As String)
+        If Not File.Exists(templateFile) Then
+            If Not isLoadingTemplate Then
+                toolStripStatusLabel1.Text = "Error: Template file not found"
+            End If
+            Return
+        End If
+
+        ' Ensure project folder is loaded first
+        If String.IsNullOrEmpty(projectFolder) OrElse Not Directory.Exists(projectFolder) Then
+            If Not isLoadingTemplate Then
+                toolStripStatusLabel1.Text = "Error: Project folder not found - please select project folder first"
+            End If
+            Return
+        End If
+
+        ' Ensure tree is loaded
+        If treeView1.Nodes.Count = 0 Then
+            LoadProjectFolder()
+        End If
+
+        Try
+            ' Step 1: Clear current selection (50%)
+            UpdateProgress(50, "Clearing current selections...")
+            Application.DoEvents()
+            ClearAllChecks(treeView1.Nodes)
+
+            ' Step 2: Read template file (60%)
+            UpdateProgress(60, "Reading template file...")
+            Application.DoEvents()
+            Dim content As String = File.ReadAllText(templateFile)
+            Dim filesLoaded As Integer = 0
+            Dim filesNotFound As Integer = 0
+            Dim filesToLoad As New List(Of String)
+
+            ' Step 3: Parse template sections (65%)
+            UpdateProgress(65, "Parsing template sections...")
+            Application.DoEvents()
+
+            ' First pass: collect all files from the template
+            Dim sections() As String = content.Split(New String() {"[TEMPLATE]"}, StringSplitOptions.RemoveEmptyEntries)
+
+            For Each section In sections
+                If Not String.IsNullOrWhiteSpace(section) Then
+                    Dim lines() As String = section.Split({vbCrLf, vbLf, vbCr}, StringSplitOptions.RemoveEmptyEntries)
+                    Dim foundTemplate As Boolean = False
+
+                    ' Check if this section contains our template
+                    For Each line In lines
+                        Dim trimmedLine As String = line.Trim()
+                        If Not String.IsNullOrWhiteSpace(trimmedLine) AndAlso Not trimmedLine.StartsWith("#") Then
+                            If trimmedLine.StartsWith("Name=") Then
+                                Dim currentTemplateName As String = trimmedLine.Substring("Name=".Length).Trim()
+                                If currentTemplateName.Equals(templateName, StringComparison.OrdinalIgnoreCase) Then
+                                    foundTemplate = True
+                                End If
+                                Exit For
+                            End If
+                        End If
+                    Next
+
+                    ' If we found the right template, collect its files
+                    If foundTemplate Then
+                        For Each line In lines
+                            Dim trimmedLine As String = line.Trim()
+                            If Not String.IsNullOrWhiteSpace(trimmedLine) AndAlso Not trimmedLine.StartsWith("#") Then
+                                If trimmedLine.StartsWith("File=") Then
+                                    Dim filePath As String = trimmedLine.Substring("File=".Length).Trim()
+                                    If Not String.IsNullOrWhiteSpace(filePath) Then
+                                        filesToLoad.Add(filePath)
+                                    End If
+                                End If
+                            End If
+                        Next
+                        Exit For ' Found and processed the template, exit loop
+                    End If
+                End If
+            Next
+
+            ' Step 4: Process files with progress (70% - 90%)
+            UpdateProgress(70, "Preparing to load " & filesToLoad.Count & " files...")
+            Application.DoEvents()
+
+            Dim progressStep As Double = 20.0 / Math.Max(filesToLoad.Count, 1) ' 20% range for file processing
+            Dim fileIndex As Integer = 0
+
+            For Each filePath In filesToLoad
+                fileIndex += 1
+                Dim currentProgress As Integer = 70 + CInt(fileIndex * progressStep)
+                Dim fileName As String = Path.GetFileName(filePath)
+                UpdateProgress(currentProgress, $"Loading file {fileIndex}/{filesToLoad.Count}: {fileName}")
+                Application.DoEvents()
+
+                If File.Exists(filePath) OrElse Directory.Exists(filePath) Then
+                    ' Check if file is within project folder
+                    If filePath.StartsWith(projectFolder, StringComparison.OrdinalIgnoreCase) Then
+                        SelectFileInTree(filePath)
+                        Dim node As TreeNode = FindNodeByPath(treeView1.Nodes, filePath)
+                        If node IsNot Nothing AndAlso node.Checked Then
+                            filesLoaded += 1
+                        Else
+                            filesNotFound += 1
+                        End If
+                    Else
+                        filesNotFound += 1
+                    End If
+                Else
+                    filesNotFound += 1
+                End If
+
+                ' Small delay to show progress
+                System.Threading.Thread.Sleep(10)
+            Next
+
+            UpdateTokenCount()
+
+            ' Show status message
+            If Not isLoadingTemplate Then
+                If filesLoaded > 0 Then
+                    If filesNotFound > 0 Then
+                        toolStripStatusLabel1.Text = $"Template '{templateName}' loaded: {filesLoaded} files found, {filesNotFound} missing"
+                    Else
+                        toolStripStatusLabel1.Text = $"Template '{templateName}' loaded successfully: {filesLoaded} files selected"
+                    End If
+                Else
+                    toolStripStatusLabel1.Text = $"Template '{templateName}' loaded but no files found in project"
+                End If
+            End If
+
+        Catch ex As Exception
+            If Not isLoadingTemplate Then
+                toolStripStatusLabel1.Text = $"Error loading template '{templateName}': {ex.Message}"
+            End If
+        End Try
+    End Sub
+
+    Private Sub LoadTemplate(templateName As String)
+        If Not File.Exists(templateFile) Then
+            If Not isLoadingTemplate Then
+                toolStripStatusLabel1.Text = "Error: Template file not found"
+            End If
+            Return
+        End If
+
+        ' Ensure project folder is loaded first
+        If String.IsNullOrEmpty(projectFolder) OrElse Not Directory.Exists(projectFolder) Then
+            If Not isLoadingTemplate Then
+                toolStripStatusLabel1.Text = "Error: Project folder not found - please select project folder first"
+            End If
+            Return
+        End If
+
+        ' Ensure tree is loaded
+        If treeView1.Nodes.Count = 0 Then
+            LoadProjectFolder()
+        End If
+
+        Try
+            ' Clear current selection first
+            ClearAllChecks(treeView1.Nodes)
+
+            Dim content As String = File.ReadAllText(templateFile)
+            Dim filesLoaded As Integer = 0
+            Dim filesNotFound As Integer = 0
+            Dim filesToLoad As New List(Of String)
+
+            ' First pass: collect all files from the template
+            Dim sections() As String = content.Split(New String() {"[TEMPLATE]"}, StringSplitOptions.RemoveEmptyEntries)
+
+            For Each section In sections
+                If Not String.IsNullOrWhiteSpace(section) Then
+                    Dim lines() As String = section.Split({vbCrLf, vbLf, vbCr}, StringSplitOptions.RemoveEmptyEntries)
+                    Dim foundTemplate As Boolean = False
+
+                    ' Check if this section contains our template
+                    For Each line In lines
+                        Dim trimmedLine As String = line.Trim()
+                        If Not String.IsNullOrWhiteSpace(trimmedLine) AndAlso Not trimmedLine.StartsWith("#") Then
+                            If trimmedLine.StartsWith("Name=") Then
+                                Dim currentTemplateName As String = trimmedLine.Substring("Name=".Length).Trim()
+                                If currentTemplateName.Equals(templateName, StringComparison.OrdinalIgnoreCase) Then
+                                    foundTemplate = True
+                                End If
+                                Exit For
+                            End If
+                        End If
+                    Next
+
+                    ' If we found the right template, collect its files
+                    If foundTemplate Then
+                        For Each line In lines
+                            Dim trimmedLine As String = line.Trim()
+                            If Not String.IsNullOrWhiteSpace(trimmedLine) AndAlso Not trimmedLine.StartsWith("#") Then
+                                If trimmedLine.StartsWith("File=") Then
+                                    Dim filePath As String = trimmedLine.Substring("File=".Length).Trim()
+                                    If Not String.IsNullOrWhiteSpace(filePath) Then
+                                        filesToLoad.Add(filePath)
+                                    End If
+                                End If
+                            End If
+                        Next
+                        Exit For ' Found and processed the template, exit loop
+                    End If
+                End If
+            Next
+
+            ' Second pass: try to select each file
+            For Each filePath In filesToLoad
+                If File.Exists(filePath) OrElse Directory.Exists(filePath) Then
+                    ' Check if file is within project folder
+                    If filePath.StartsWith(projectFolder, StringComparison.OrdinalIgnoreCase) Then
+                        SelectFileInTree(filePath)
+                        Dim node As TreeNode = FindNodeByPath(treeView1.Nodes, filePath)
+                        If node IsNot Nothing AndAlso node.Checked Then
+                            filesLoaded += 1
+                        Else
+                            filesNotFound += 1
+                        End If
+                    Else
+                        filesNotFound += 1
+                    End If
+                Else
+                    filesNotFound += 1
+                End If
+            Next
+
+            UpdateTokenCount()
+
+            ' Show status message
+            If Not isLoadingTemplate Then
+                If filesLoaded > 0 Then
+                    If filesNotFound > 0 Then
+                        toolStripStatusLabel1.Text = $"Template '{templateName}' loaded: {filesLoaded} files found, {filesNotFound} missing"
+                    Else
+                        toolStripStatusLabel1.Text = $"Template '{templateName}' loaded successfully: {filesLoaded} files selected"
+                    End If
+                Else
+                    toolStripStatusLabel1.Text = $"Template '{templateName}' loaded but no files found in project"
+                End If
+            End If
+
+        Catch ex As Exception
+            If Not isLoadingTemplate Then
+                toolStripStatusLabel1.Text = $"Error loading template '{templateName}': {ex.Message}"
+            End If
+        End Try
+    End Sub
+
+    Private Sub ClearAllChecks(nodes As TreeNodeCollection)
+        isUpdatingNodes = True
+        Try
+            For Each node As TreeNode In nodes
+                node.Checked = False
+                ClearAllChecks(node.Nodes)
+            Next
+        Finally
+            isUpdatingNodes = False
+        End Try
+    End Sub
+
+    Private Function GetCheckedFiles() As List(Of String)
+        Dim checkedFiles As New List(Of String)
+        CollectCheckedFiles(treeView1.Nodes, checkedFiles)
+        Return checkedFiles
+    End Function
+
+    Private Sub CollectCheckedFiles(nodes As TreeNodeCollection, checkedFiles As List(Of String))
+        For Each node As TreeNode In nodes
+            If node.Checked AndAlso node.Tag IsNot Nothing Then
+                Dim path As String = node.Tag.ToString()
+                If File.Exists(path) Then
+                    checkedFiles.Add(path)
+                End If
+            End If
+            CollectCheckedFiles(node.Nodes, checkedFiles)
+        Next
+    End Sub
+
+    Private Sub cmbTemplate_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cmbTemplate.SelectedIndexChanged
+        ' Prevent recursive calls during template loading
+        If isLoadingTemplate Then Return
+
+        ' Enable/disable buttons based on selection
+        btnLoadTemplate.Enabled = (cmbTemplate.SelectedItem IsNot Nothing)
+        btnCopyTemplate.Enabled = (cmbTemplate.SelectedItem IsNot Nothing)
+        btnUpdateTemplate.Enabled = (cmbTemplate.SelectedItem IsNot Nothing)
+
+        If cmbTemplate.SelectedItem IsNot Nothing Then
+            toolStripStatusLabel1.Text = "Template selected: " & cmbTemplate.SelectedItem.ToString()
+
+            ' Auto-load the selected template
+            AutoLoadTemplate(cmbTemplate.SelectedItem.ToString())
+        Else
+            toolStripStatusLabel1.Text = "No template selected"
+        End If
+    End Sub
+
+    Private Sub AutoLoadTemplate(templateName As String)
+        ' Only auto-load if we have a project folder
+        If String.IsNullOrEmpty(projectFolder) OrElse Not Directory.Exists(projectFolder) Then
+            Return
+        End If
+
+        ' Ensure tree is loaded
+        EnsureTreeLoaded()
+
+        Try
+            isLoadingTemplate = True
+            LoadTemplate(templateName)
+
+            ' Count loaded files for status
+            Dim loadedFiles As List(Of String) = GetCheckedFiles()
+            toolStripStatusLabel1.Text = "Template '" & templateName & "' auto-loaded - " & loadedFiles.Count & " files selected"
+
+        Catch ex As Exception
+            toolStripStatusLabel1.Text = "Error auto-loading template: " & ex.Message
+        Finally
+            isLoadingTemplate = False
+        End Try
+    End Sub
+
+    Private Sub btnCombine_Click(sender As Object, e As EventArgs) Handles btnCombine.Click
+        If String.IsNullOrWhiteSpace(projectFolder) Then
+            toolStripStatusLabel1.Text = "Error: Please select a project folder first"
+            Return
+        End If
+
+        If String.IsNullOrWhiteSpace(outputFolder) Then
+            toolStripStatusLabel1.Text = "Error: Please set output folder in Settings > Application Settings"
+            Return
+        End If
+
+        If cmbProjectType.SelectedItem Is Nothing Then
+            toolStripStatusLabel1.Text = "Error: Please select a project type"
+            Return
+        End If
+
+        Dim checkedFiles As List(Of String) = GetCheckedFiles()
+        If checkedFiles.Count = 0 Then
+            toolStripStatusLabel1.Text = "Error: Please select at least one file to combine"
+            Return
+        End If
+
+        ' Ensure output folder exists and is writable
+        Try
+            If Not Directory.Exists(outputFolder) Then
+                Directory.CreateDirectory(outputFolder)
+                toolStripStatusLabel1.Text = "Created output folder: " & outputFolder
+                Application.DoEvents()
+            End If
+
+            ' Test write permissions by creating a temporary file
+            Dim testFile As String = Path.Combine(outputFolder, "test_write_permission.tmp")
+            File.WriteAllText(testFile, "test")
+            File.Delete(testFile)
+
+        Catch ex As Exception
+            toolStripStatusLabel1.Text = "Error: Cannot write to output folder - " & ex.Message
+            Return
+        End Try
+
+        ' Show and initialize progress bar
+        progressBar1.Visible = True
+        progressBar1.Minimum = 0
+        progressBar1.Maximum = 100 ' Use percentage
+        progressBar1.Value = 0
+        progressBar1.Style = ProgressBarStyle.Continuous
+
+        ' Disable the combine button to prevent multiple operations
+        btnCombine.Enabled = False
+        btnCombine.Text = "Combining..."
+
+        Try
+            ' Step 1: Initialize (5%)
+            UpdateProgress(5, "Initializing...")
+            Application.DoEvents()
+
+            ' Find SQL files in the selected files
+            Dim selectedSqlFiles As New List(Of String)
+            For Each filePath In checkedFiles
+                If File.Exists(filePath) AndAlso Path.GetExtension(filePath).ToLower() = ".sql" Then
+                    selectedSqlFiles.Add(filePath)
+                End If
+            Next
+
+            ' Combine configured SQL files with selected SQL files
+            Dim allSqlFiles As New List(Of String)(databaseFiles)
+            For Each sqlFile In selectedSqlFiles
+                If Not allSqlFiles.Contains(sqlFile) Then
+                    allSqlFiles.Add(sqlFile)
+                End If
+            Next
+
+            ' Step 2: Preparation (10%)
+            UpdateProgress(10, "Preparing file list...")
+            Application.DoEvents()
+
+            ' Step 3: Start combining (15%)
+            UpdateProgress(15, "Starting file combination...")
+            Application.DoEvents()
+
+            Dim combiner As New FileCombiner(projectFolder, outputFolder)
+
+            ' Step 4: Processing files (15% - 90%)
+            Dim result As CombineResult = CombineFilesWithProgress(combiner, checkedFiles, allSqlFiles)
+
+            ' Step 5: Finalizing (95%)
+            UpdateProgress(95, "Finalizing output files...")
+            Application.DoEvents()
+
+            ' Step 6: Complete (100%)
+            UpdateProgress(100, "Combination complete!")
+            Application.DoEvents()
+
+            If result.Success Then
+                If allSqlFiles.Count > 0 Then
+                    toolStripStatusLabel1.Text = result.Message & $" (Including {allSqlFiles.Count} SQL file(s))"
+                Else
+                    toolStripStatusLabel1.Text = result.Message
+                End If
+            Else
+                toolStripStatusLabel1.Text = "Error: " & result.Message
+            End If
+
+            ' Small delay to show completion
+            System.Threading.Thread.Sleep(500)
+
+        Catch ex As Exception
+            toolStripStatusLabel1.Text = "Error combining files: " & ex.Message
+        Finally
+            ' Hide progress bar and restore button
+            progressBar1.Visible = False
+            btnCombine.Enabled = True
+            btnCombine.Text = "🔗 Combine Files"
+        End Try
+    End Sub
+
+    Private Sub UpdateProgress(percentage As Integer, message As String)
+        ' Ensure percentage is within bounds
+        percentage = Math.Max(0, Math.Min(100, percentage))
+
+        progressBar1.Value = percentage
+        toolStripStatusLabel1.Text = message
+
+        ' Also update the status strip progress bar if it exists
+        If toolStripProgressBar1 IsNot Nothing Then
+            toolStripProgressBar1.Visible = True
+            toolStripProgressBar1.Value = percentage
+        End If
+    End Sub
+
+    Private Function CombineFilesWithProgress(combiner As FileCombiner, checkedFiles As List(Of String), allSqlFiles As List(Of String)) As CombineResult
+        ' Filter files that will actually be processed
+        Dim filesToProcess As New List(Of String)
+        For Each filePath In checkedFiles
+            If File.Exists(filePath) Then
+                filesToProcess.Add(filePath)
+            End If
+        Next
+
+        ' Process files with progress updates
+        Dim processedCount As Integer = 0
+        Dim totalFiles As Integer = filesToProcess.Count
+
+        ' Create a progress callback
+        Dim progressStep As Double = 75.0 / totalFiles ' 75% of progress for file processing (15% to 90%)
+        Dim baseProgress As Integer = 15
+
+        ' Simulate file processing progress by updating during the combine operation
+        For i As Integer = 0 To totalFiles - 1
+            Dim currentProgress As Integer = baseProgress + CInt(i * progressStep)
+            Dim fileName As String = Path.GetFileName(filesToProcess(i))
+            UpdateProgress(currentProgress, $"Processing {i + 1}/{totalFiles}: {fileName}")
+            Application.DoEvents()
+
+            ' Small delay to make progress visible (remove in production if too slow)
+            System.Threading.Thread.Sleep(25)
+        Next
+
+        ' Now perform the actual file combination
+        UpdateProgress(85, "Combining all files...")
+        Application.DoEvents()
+
+        Return combiner.CombineFiles(
+        checkedFiles,
+        cmbProjectType.SelectedItem.ToString(),
+        treeView1.Nodes,
+        txtProjectTitle.Text.Trim(),
+        "",
+        "",
+        allSqlFiles.Count > 0,
+        allSqlFiles
+    )
+    End Function
+
+    Private Sub cmbProjectType_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cmbProjectType.SelectedIndexChanged
+        ' Update token count
+        UpdateTokenCount()
+
+        ' Save the selected project type to configuration
+        SaveConfiguration()
+
+        ' Update status to show the selection was saved
+        If cmbProjectType.SelectedItem IsNot Nothing Then
+            toolStripStatusLabel1.Text = "Project type changed to: " & cmbProjectType.SelectedItem.ToString()
+        End If
+    End Sub
+
+    Private Sub settingsToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles settingsToolStripMenuItem.Click
+        Dim settingsForm As New frmSettings()
+        settingsForm.ProjectFolderPath = projectFolder
+        settingsForm.OutputFolderPath = outputFolder
+        settingsForm.DatabaseFiles = New List(Of String)(databaseFiles)
+        settingsForm.IncludeDatabase = includeDatabase
+
+        If settingsForm.ShowDialog() = DialogResult.OK Then
+            projectFolder = settingsForm.ProjectFolderPath
+            outputFolder = settingsForm.OutputFolderPath
+            databaseFiles = settingsForm.DatabaseFiles
+            includeDatabase = settingsForm.IncludeDatabase
+
+            SaveConfiguration()
+            LoadProjectFolder()
+
+            toolStripStatusLabel1.Text = $"Settings updated successfully - {databaseFiles.Count} SQL file(s) configured"
+        End If
+    End Sub
+
+    Private Sub btnRefreshTree_Click(sender As Object, e As EventArgs) Handles btnRefreshTree.Click
+        If String.IsNullOrEmpty(projectFolder) Then
+            toolStripStatusLabel1.Text = "Error: Please select a project folder first"
+            Return
+        End If
+
+        RefreshTreeView()
+        toolStripStatusLabel1.Text = "Tree view refreshed successfully"
+    End Sub
+End Class
+
+==================== FILE: frmSettings.Designer.vb ====================
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class frmSettings
+    Inherits System.Windows.Forms.Form
+
+    'Form overrides dispose to clean up the component list.
+    <System.Diagnostics.DebuggerNonUserCode()>
+    Protected Overrides Sub Dispose(disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    'Required by the Windows Form Designer
+    Private components As System.ComponentModel.IContainer
+
+    'NOTE: The following procedure is required by the Windows Form Designer
+    'It can be modified using the Windows Form Designer.  
+    'Do not modify it using the code editor.
+    <System.Diagnostics.DebuggerStepThrough()>
+    Private Sub InitializeComponent()
+        Me.grpFolders = New System.Windows.Forms.GroupBox()
+        Me.btnBrowseProject = New System.Windows.Forms.Button()
+        Me.btnBrowseOutput = New System.Windows.Forms.Button()
+        Me.txtProjectFolder = New System.Windows.Forms.TextBox()
+        Me.txtOutputFolder = New System.Windows.Forms.TextBox()
+        Me.lblProjectFolder = New System.Windows.Forms.Label()
+        Me.lblOutputFolder = New System.Windows.Forms.Label()
+        Me.grpDatabase = New System.Windows.Forms.GroupBox()
+        Me.btnClearAll = New System.Windows.Forms.Button()
+        Me.btnRemoveSelected = New System.Windows.Forms.Button()
+        Me.btnBrowseDatabase = New System.Windows.Forms.Button()
+        Me.lstDatabaseFiles = New System.Windows.Forms.ListBox()
+        Me.lblDatabaseFiles = New System.Windows.Forms.Label()
+        Me.chkIncludeDatabase = New System.Windows.Forms.CheckBox()
+        Me.btnOK = New System.Windows.Forms.Button()
+        Me.btnCancel = New System.Windows.Forms.Button()
+        Me.folderBrowserDialog1 = New System.Windows.Forms.FolderBrowserDialog()
+        Me.openFileDialog1 = New System.Windows.Forms.OpenFileDialog()
+        Me.grpFolders.SuspendLayout()
+        Me.grpDatabase.SuspendLayout()
+        Me.SuspendLayout()
+
+        ' grpFolders
+        Me.grpFolders.Controls.Add(Me.btnBrowseProject)
+        Me.grpFolders.Controls.Add(Me.btnBrowseOutput)
+        Me.grpFolders.Controls.Add(Me.txtProjectFolder)
+        Me.grpFolders.Controls.Add(Me.txtOutputFolder)
+        Me.grpFolders.Controls.Add(Me.lblProjectFolder)
+        Me.grpFolders.Controls.Add(Me.lblOutputFolder)
+        Me.grpFolders.Location = New System.Drawing.Point(12, 12)
+        Me.grpFolders.Name = "grpFolders"
+        Me.grpFolders.Size = New System.Drawing.Size(560, 120)
+        Me.grpFolders.TabIndex = 0
+        Me.grpFolders.TabStop = False
+        Me.grpFolders.Text = "Folder Settings"
+
+        ' lblProjectFolder
+        Me.lblProjectFolder.AutoSize = True
+        Me.lblProjectFolder.Location = New System.Drawing.Point(20, 30)
+        Me.lblProjectFolder.Name = "lblProjectFolder"
+        Me.lblProjectFolder.Size = New System.Drawing.Size(90, 17)
+        Me.lblProjectFolder.TabIndex = 0
+        Me.lblProjectFolder.Text = "Project Folder:"
+
+        ' txtProjectFolder
+        Me.txtProjectFolder.Location = New System.Drawing.Point(120, 27)
+        Me.txtProjectFolder.Name = "txtProjectFolder"
+        Me.txtProjectFolder.Size = New System.Drawing.Size(350, 22)
+        Me.txtProjectFolder.TabIndex = 1
+
+        ' btnBrowseProject
+        Me.btnBrowseProject.Location = New System.Drawing.Point(480, 25)
+        Me.btnBrowseProject.Name = "btnBrowseProject"
+        Me.btnBrowseProject.Size = New System.Drawing.Size(70, 26)
+        Me.btnBrowseProject.TabIndex = 2
+        Me.btnBrowseProject.Text = "Browse..."
+        Me.btnBrowseProject.UseVisualStyleBackColor = True
+
+        ' lblOutputFolder
+        Me.lblOutputFolder.AutoSize = True
+        Me.lblOutputFolder.Location = New System.Drawing.Point(20, 70)
+        Me.lblOutputFolder.Name = "lblOutputFolder"
+        Me.lblOutputFolder.Size = New System.Drawing.Size(90, 17)
+        Me.lblOutputFolder.TabIndex = 3
+        Me.lblOutputFolder.Text = "Output Folder:"
+
+        ' txtOutputFolder
+        Me.txtOutputFolder.Location = New System.Drawing.Point(120, 67)
+        Me.txtOutputFolder.Name = "txtOutputFolder"
+        Me.txtOutputFolder.Size = New System.Drawing.Size(350, 22)
+        Me.txtOutputFolder.TabIndex = 4
+
+        ' btnBrowseOutput
+        Me.btnBrowseOutput.Location = New System.Drawing.Point(480, 65)
+        Me.btnBrowseOutput.Name = "btnBrowseOutput"
+        Me.btnBrowseOutput.Size = New System.Drawing.Size(70, 26)
+        Me.btnBrowseOutput.TabIndex = 5
+        Me.btnBrowseOutput.Text = "Browse..."
+        Me.btnBrowseOutput.UseVisualStyleBackColor = True
+
+        ' grpDatabase
+        Me.grpDatabase.Controls.Add(Me.chkIncludeDatabase)
+        Me.grpDatabase.Controls.Add(Me.lblDatabaseFiles)
+        Me.grpDatabase.Controls.Add(Me.lstDatabaseFiles)
+        Me.grpDatabase.Controls.Add(Me.btnBrowseDatabase)
+        Me.grpDatabase.Controls.Add(Me.btnRemoveSelected)
+        Me.grpDatabase.Controls.Add(Me.btnClearAll)
+        Me.grpDatabase.Location = New System.Drawing.Point(12, 150)
+        Me.grpDatabase.Name = "grpDatabase"
+        Me.grpDatabase.Size = New System.Drawing.Size(560, 220)
+        Me.grpDatabase.TabIndex = 1
+        Me.grpDatabase.TabStop = False
+        Me.grpDatabase.Text = "Database Settings"
+
+        ' chkIncludeDatabase
+        Me.chkIncludeDatabase.AutoSize = True
+        Me.chkIncludeDatabase.Location = New System.Drawing.Point(20, 25)
+        Me.chkIncludeDatabase.Name = "chkIncludeDatabase"
+        Me.chkIncludeDatabase.Size = New System.Drawing.Size(200, 21)
+        Me.chkIncludeDatabase.TabIndex = 0
+        Me.chkIncludeDatabase.Text = "Include SQL Database Files"
+        Me.chkIncludeDatabase.UseVisualStyleBackColor = True
+
+        ' lblDatabaseFiles
+        Me.lblDatabaseFiles.AutoSize = True
+        Me.lblDatabaseFiles.Location = New System.Drawing.Point(20, 60)
+        Me.lblDatabaseFiles.Name = "lblDatabaseFiles"
+        Me.lblDatabaseFiles.Size = New System.Drawing.Size(150, 17)
+        Me.lblDatabaseFiles.TabIndex = 1
+        Me.lblDatabaseFiles.Text = "Selected SQL Files (0):"
+
+        ' lstDatabaseFiles
+        Me.lstDatabaseFiles.FormattingEnabled = True
+        Me.lstDatabaseFiles.ItemHeight = 16
+        Me.lstDatabaseFiles.Location = New System.Drawing.Point(20, 85)
+        Me.lstDatabaseFiles.Name = "lstDatabaseFiles"
+        Me.lstDatabaseFiles.Size = New System.Drawing.Size(450, 84)
+        Me.lstDatabaseFiles.TabIndex = 2
+
+        ' btnBrowseDatabase
+        Me.btnBrowseDatabase.Location = New System.Drawing.Point(480, 85)
+        Me.btnBrowseDatabase.Name = "btnBrowseDatabase"
+        Me.btnBrowseDatabase.Size = New System.Drawing.Size(70, 30)
+        Me.btnBrowseDatabase.TabIndex = 3
+        Me.btnBrowseDatabase.Text = "Add SQL..."
+        Me.btnBrowseDatabase.UseVisualStyleBackColor = True
+
+        ' btnRemoveSelected
+        Me.btnRemoveSelected.Location = New System.Drawing.Point(480, 125)
+        Me.btnRemoveSelected.Name = "btnRemoveSelected"
+        Me.btnRemoveSelected.Size = New System.Drawing.Size(70, 30)
+        Me.btnRemoveSelected.TabIndex = 4
+        Me.btnRemoveSelected.Text = "Remove"
+        Me.btnRemoveSelected.UseVisualStyleBackColor = True
+
+        ' btnClearAll
+        Me.btnClearAll.Location = New System.Drawing.Point(480, 165)
+        Me.btnClearAll.Name = "btnClearAll"
+        Me.btnClearAll.Size = New System.Drawing.Size(70, 30)
+        Me.btnClearAll.TabIndex = 5
+        Me.btnClearAll.Text = "Clear All"
+        Me.btnClearAll.UseVisualStyleBackColor = True
+
+        ' btnOK
+        Me.btnOK.Location = New System.Drawing.Point(400, 390)
+        Me.btnOK.Name = "btnOK"
+        Me.btnOK.Size = New System.Drawing.Size(80, 30)
+        Me.btnOK.TabIndex = 2
+        Me.btnOK.Text = "OK"
+        Me.btnOK.UseVisualStyleBackColor = True
+
+        ' btnCancel
+        Me.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel
+        Me.btnCancel.Location = New System.Drawing.Point(490, 390)
+        Me.btnCancel.Name = "btnCancel"
+        Me.btnCancel.Size = New System.Drawing.Size(80, 30)
+        Me.btnCancel.TabIndex = 3
+        Me.btnCancel.Text = "Cancel"
+        Me.btnCancel.UseVisualStyleBackColor = True
+
+        ' openFileDialog1
+        Me.openFileDialog1.Filter = "SQL Script Files|*.sql"
+        Me.openFileDialog1.Multiselect = True
+        Me.openFileDialog1.Title = "Select SQL Database Files"
+
+        ' frmSettings
+        Me.AcceptButton = Me.btnOK
+        Me.AutoScaleDimensions = New System.Drawing.SizeF(8.0!, 16.0!)
+        Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
+        Me.CancelButton = Me.btnCancel
+        Me.ClientSize = New System.Drawing.Size(584, 441)
+        Me.Controls.Add(Me.btnCancel)
+        Me.Controls.Add(Me.btnOK)
+        Me.Controls.Add(Me.grpDatabase)
+        Me.Controls.Add(Me.grpFolders)
+        Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.Name = "frmSettings"
+        Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent
+        Me.Text = "Application Settings"
+        Me.grpFolders.ResumeLayout(False)
+        Me.grpFolders.PerformLayout()
+        Me.grpDatabase.ResumeLayout(False)
+        Me.grpDatabase.PerformLayout()
+        Me.ResumeLayout(False)
+    End Sub
+
+    Friend WithEvents grpFolders As GroupBox
+    Friend WithEvents btnBrowseProject As Button
+    Friend WithEvents btnBrowseOutput As Button
+    Friend WithEvents txtProjectFolder As TextBox
+    Friend WithEvents txtOutputFolder As TextBox
+    Friend WithEvents lblProjectFolder As Label
+    Friend WithEvents lblOutputFolder As Label
+    Friend WithEvents grpDatabase As GroupBox
+    Friend WithEvents btnClearAll As Button
+    Friend WithEvents btnRemoveSelected As Button
+    Friend WithEvents btnBrowseDatabase As Button
+    Friend WithEvents lstDatabaseFiles As ListBox
+    Friend WithEvents lblDatabaseFiles As Label
+    Friend WithEvents chkIncludeDatabase As CheckBox
+    Friend WithEvents btnOK As Button
+    Friend WithEvents btnCancel As Button
+    Friend WithEvents folderBrowserDialog1 As FolderBrowserDialog
+    Friend WithEvents openFileDialog1 As OpenFileDialog
+
+End Class
+
+==================== FILE: frmSettings.vb ====================
+Imports System.IO
+
+Public Class frmSettings
+    Public Property ProjectFolderPath As String = ""
+    Public Property OutputFolderPath As String = ""
+    Public Property DatabaseFiles As New List(Of String) ' Changed to support multiple files
+    Public Property IncludeDatabase As Boolean = False
+
+    Private Sub frmSettings_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ' Load current settings into the form
+        txtProjectFolder.Text = ProjectFolderPath
+        txtOutputFolder.Text = OutputFolderPath
+
+        ' Display selected database files
+        UpdateDatabaseFilesList()
+        chkIncludeDatabase.Checked = IncludeDatabase
+
+        ' Enable/disable database controls based on checkbox
+        UpdateDatabaseControls()
+    End Sub
+
+    Private Sub UpdateDatabaseFilesList()
+        ' Clear and update the database files display
+        lstDatabaseFiles.Items.Clear()
+        For Each filePath In DatabaseFiles
+            lstDatabaseFiles.Items.Add(Path.GetFileName(filePath) & " - " & filePath)
+        Next
+
+        ' Update label to show count
+        lblDatabaseFiles.Text = $"Selected SQL Files ({DatabaseFiles.Count}):"
+    End Sub
+
+    Private Sub btnBrowseProject_Click(sender As Object, e As EventArgs) Handles btnBrowseProject.Click
+        folderBrowserDialog1.Description = "Select Project Folder"
+        folderBrowserDialog1.ShowNewFolderButton = True
+
+        If Not String.IsNullOrEmpty(txtProjectFolder.Text) AndAlso Directory.Exists(txtProjectFolder.Text) Then
+            folderBrowserDialog1.SelectedPath = txtProjectFolder.Text
+        End If
+
+        If folderBrowserDialog1.ShowDialog() = DialogResult.OK Then
+            txtProjectFolder.Text = folderBrowserDialog1.SelectedPath
+        End If
+    End Sub
+
+    Private Sub btnBrowseOutput_Click(sender As Object, e As EventArgs) Handles btnBrowseOutput.Click
+        folderBrowserDialog1.Description = "Select Output Folder"
+        folderBrowserDialog1.ShowNewFolderButton = True
+
+        If Not String.IsNullOrEmpty(txtOutputFolder.Text) AndAlso Directory.Exists(txtOutputFolder.Text) Then
+            folderBrowserDialog1.SelectedPath = txtOutputFolder.Text
+        End If
+
+        If folderBrowserDialog1.ShowDialog() = DialogResult.OK Then
+            txtOutputFolder.Text = folderBrowserDialog1.SelectedPath
+        End If
+    End Sub
+
+    Private Sub btnBrowseDatabase_Click(sender As Object, e As EventArgs) Handles btnBrowseDatabase.Click
+        ' Configure for multiple SQL files only
+        openFileDialog1.Filter = "SQL Script Files|*.sql"
+        openFileDialog1.Title = "Select SQL Database Files"
+        openFileDialog1.Multiselect = True ' Enable multiple file selection
+
+        If DatabaseFiles.Count > 0 Then
+            ' Set initial directory to the first selected file's directory
+            openFileDialog1.InitialDirectory = Path.GetDirectoryName(DatabaseFiles(0))
+        End If
+
+        If openFileDialog1.ShowDialog() = DialogResult.OK Then
+            ' Add selected files to the list (avoid duplicates)
+            For Each selectedFile In openFileDialog1.FileNames
+                If Not DatabaseFiles.Contains(selectedFile) Then
+                    DatabaseFiles.Add(selectedFile)
+                End If
+            Next
+
+            UpdateDatabaseFilesList()
+        End If
+    End Sub
+
+    Private Sub btnRemoveSelected_Click(sender As Object, e As EventArgs) Handles btnRemoveSelected.Click
+        ' Remove selected items from the list
+        If lstDatabaseFiles.SelectedIndex >= 0 Then
+            Dim indexToRemove As Integer = lstDatabaseFiles.SelectedIndex
+            DatabaseFiles.RemoveAt(indexToRemove)
+            UpdateDatabaseFilesList()
+        End If
+    End Sub
+
+    Private Sub btnClearAll_Click(sender As Object, e As EventArgs) Handles btnClearAll.Click
+        ' Clear all database files
+        DatabaseFiles.Clear()
+        UpdateDatabaseFilesList()
+    End Sub
+
+    Private Sub chkIncludeDatabase_CheckedChanged(sender As Object, e As EventArgs) Handles chkIncludeDatabase.CheckedChanged
+        UpdateDatabaseControls()
+    End Sub
+
+    Private Sub UpdateDatabaseControls()
+        Dim enabled As Boolean = chkIncludeDatabase.Checked
+        lstDatabaseFiles.Enabled = enabled
+        btnBrowseDatabase.Enabled = enabled
+        btnRemoveSelected.Enabled = enabled
+        btnClearAll.Enabled = enabled
+        lblDatabaseFiles.Enabled = enabled
+    End Sub
+
+    Private Sub btnOK_Click(sender As Object, e As EventArgs) Handles btnOK.Click
+        ' Validate inputs
+        If String.IsNullOrWhiteSpace(txtProjectFolder.Text) Then
+            MessageBox.Show("Please select a project folder.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtProjectFolder.Focus()
+            Return
+        End If
+
+        If String.IsNullOrWhiteSpace(txtOutputFolder.Text) Then
+            MessageBox.Show("Please select an output folder.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtOutputFolder.Focus()
+            Return
+        End If
+
+        If chkIncludeDatabase.Checked Then
+            If DatabaseFiles.Count = 0 Then
+                MessageBox.Show("Please select at least one SQL database file.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                btnBrowseDatabase.Focus()
+                Return
+            End If
+
+            ' Validate that all selected files exist and are SQL files
+            For Each filePath In DatabaseFiles.ToList() ' Use ToList to avoid modification during iteration
+                If Not File.Exists(filePath) Then
+                    MessageBox.Show($"Database file not found: {filePath}", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    DatabaseFiles.Remove(filePath) ' Remove non-existent files
+                    UpdateDatabaseFilesList()
+                    Return
+                End If
+
+                If Path.GetExtension(filePath).ToLower() <> ".sql" Then
+                    MessageBox.Show($"Only SQL files are supported: {filePath}", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    DatabaseFiles.Remove(filePath) ' Remove non-SQL files
+                    UpdateDatabaseFilesList()
+                    Return
+                End If
+            Next
+        End If
+
+        ' Save settings
+        ProjectFolderPath = txtProjectFolder.Text.Trim()
+        OutputFolderPath = txtOutputFolder.Text.Trim()
+        IncludeDatabase = chkIncludeDatabase.Checked
+
+        DialogResult = DialogResult.OK
+        Close()
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs) Handles btnCancel.Click
+        DialogResult = DialogResult.Cancel
+        Close()
+    End Sub
+End Class
+
+==================== FILE: IniHelper.vb ====================
+Imports System.IO
+Imports System.Text
+
+Public Class IniHelper
+    Private filePath As String
+
+    Public Sub New(iniFilePath As String)
+        filePath = iniFilePath
+    End Sub
+
+    Public Function ReadValue(section As String, key As String, Optional defaultValue As String = "") As String
+        If Not File.Exists(filePath) Then
+            Return defaultValue
+        End If
+
+        Try
+            Dim lines() As String = File.ReadAllLines(filePath)
+            Dim currentSection As String = ""
+            Dim inTargetSection As Boolean = False
+
+            For Each line In lines
+                Dim trimmedLine As String = line.Trim()
+
+                ' Skip empty lines and comments
+                If String.IsNullOrEmpty(trimmedLine) OrElse trimmedLine.StartsWith(";") OrElse trimmedLine.StartsWith("#") Then
+                    Continue For
+                End If
+
+                ' Check for section headers
+                If trimmedLine.StartsWith("[") AndAlso trimmedLine.EndsWith("]") Then
+                    currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2)
+                    inTargetSection = currentSection.Equals(section, StringComparison.OrdinalIgnoreCase)
+                    Continue For
+                End If
+
+                ' Check for key-value pairs in the target section
+                If inTargetSection AndAlso trimmedLine.Contains("=") Then
+                    Dim equalIndex As Integer = trimmedLine.IndexOf("=")
+                    Dim currentKey As String = trimmedLine.Substring(0, equalIndex).Trim()
+                    Dim value As String = trimmedLine.Substring(equalIndex + 1).Trim()
+
+                    If currentKey.Equals(key, StringComparison.OrdinalIgnoreCase) Then
+                        Return value
+                    End If
+                End If
+            Next
+        Catch ex As Exception
+            ' Handle any file reading errors
+            Return defaultValue
+        End Try
+
+        Return defaultValue
+    End Function
+
+    Public Sub WriteValue(section As String, key As String, value As String)
+        Dim lines As New List(Of String)
+        Dim sectionExists As Boolean = False
+        Dim keyExists As Boolean = False
+        Dim currentSection As String = ""
+        Dim sectionStartIndex As Integer = -1
+        Dim sectionEndIndex As Integer = -1
+
+        ' Read existing content if file exists
+        If File.Exists(filePath) Then
+            lines.AddRange(File.ReadAllLines(filePath))
+        End If
+
+        ' Find the section and key
+        For i As Integer = 0 To lines.Count - 1
+            Dim trimmedLine As String = lines(i).Trim()
+
+            ' Check for section headers
+            If trimmedLine.StartsWith("[") AndAlso trimmedLine.EndsWith("]") Then
+                If sectionExists AndAlso sectionEndIndex = -1 Then
+                    sectionEndIndex = i - 1
+                End If
+
+                currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2)
+                If currentSection.Equals(section, StringComparison.OrdinalIgnoreCase) Then
+                    sectionExists = True
+                    sectionStartIndex = i
+                End If
+                Continue For
+            End If
+
+            ' Check for key-value pairs in the target section
+            If sectionExists AndAlso sectionEndIndex = -1 AndAlso trimmedLine.Contains("=") Then
+                Dim equalIndex As Integer = trimmedLine.IndexOf("=")
+                Dim currentKey As String = trimmedLine.Substring(0, equalIndex).Trim()
+
+                If currentKey.Equals(key, StringComparison.OrdinalIgnoreCase) Then
+                    lines(i) = key & "=" & value
+                    keyExists = True
+                    Exit For
+                End If
+            End If
+        Next
+
+        ' Set section end index if we reached the end of file
+        If sectionExists AndAlso sectionEndIndex = -1 Then
+            sectionEndIndex = lines.Count - 1
+        End If
+
+        ' Add section if it doesn't exist
+        If Not sectionExists Then
+            If lines.Count > 0 AndAlso Not String.IsNullOrEmpty(lines(lines.Count - 1)) Then
+                lines.Add("")
+            End If
+            lines.Add("[" & section & "]")
+            lines.Add(key & "=" & value)
+        ElseIf Not keyExists Then
+            ' Add key to existing section
+            If sectionEndIndex >= sectionStartIndex Then
+                lines.Insert(sectionEndIndex + 1, key & "=" & value)
+            Else
+                lines.Add(key & "=" & value)
+            End If
+        End If
+
+        ' Write back to file
+        Try
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath))
+            File.WriteAllLines(filePath, lines, Encoding.UTF8)
+        Catch ex As Exception
+            Throw New Exception("Unable to write to INI file: " & ex.Message)
+        End Try
+    End Sub
+
+    Public Function GetSections() As List(Of String)
+        Dim sections As New List(Of String)
+
+        If Not File.Exists(filePath) Then
+            Return sections
+        End If
+
+        Try
+            Dim lines() As String = File.ReadAllLines(filePath)
+
+            For Each line In lines
+                Dim trimmedLine As String = line.Trim()
+
+                If trimmedLine.StartsWith("[") AndAlso trimmedLine.EndsWith("]") Then
+                    Dim sectionName As String = trimmedLine.Substring(1, trimmedLine.Length - 2)
+                    If Not sections.Contains(sectionName) Then
+                        sections.Add(sectionName)
+                    End If
+                End If
+            Next
+        Catch ex As Exception
+            ' Handle any file reading errors
+        End Try
+
+        Return sections
+    End Function
+
+    Public Function GetKeys(section As String) As List(Of String)
+        Dim keys As New List(Of String)
+
+        If Not File.Exists(filePath) Then
+            Return keys
+        End If
+
+        Try
+            Dim lines() As String = File.ReadAllLines(filePath)
+            Dim currentSection As String = ""
+            Dim inTargetSection As Boolean = False
+
+            For Each line In lines
+                Dim trimmedLine As String = line.Trim()
+
+                ' Skip empty lines and comments
+                If String.IsNullOrEmpty(trimmedLine) OrElse trimmedLine.StartsWith(";") OrElse trimmedLine.StartsWith("#") Then
+                    Continue For
+                End If
+
+                ' Check for section headers
+                If trimmedLine.StartsWith("[") AndAlso trimmedLine.EndsWith("]") Then
+                    currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2)
+                    inTargetSection = currentSection.Equals(section, StringComparison.OrdinalIgnoreCase)
+                    Continue For
+                End If
+
+                ' Collect keys from the target section
+                If inTargetSection AndAlso trimmedLine.Contains("=") Then
+                    Dim equalIndex As Integer = trimmedLine.IndexOf("=")
+                    Dim keyName As String = trimmedLine.Substring(0, equalIndex).Trim()
+                    If Not keys.Contains(keyName) Then
+                        keys.Add(keyName)
+                    End If
+                End If
+            Next
+        Catch ex As Exception
+            ' Handle any file reading errors
+        End Try
+
+        Return keys
+    End Function
+
+    Public Sub DeleteKey(section As String, key As String)
+        If Not File.Exists(filePath) Then
+            Return
+        End If
+
+        Try
+            Dim lines As New List(Of String)(File.ReadAllLines(filePath))
+            Dim currentSection As String = ""
+            Dim inTargetSection As Boolean = False
+
+            For i As Integer = lines.Count - 1 To 0 Step -1
+                Dim trimmedLine As String = lines(i).Trim()
+
+                ' Skip empty lines and comments
+                If String.IsNullOrEmpty(trimmedLine) OrElse trimmedLine.StartsWith(";") OrElse trimmedLine.StartsWith("#") Then
+                    Continue For
+                End If
+
+                ' Check for section headers
+                If trimmedLine.StartsWith("[") AndAlso trimmedLine.EndsWith("]") Then
+                    currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2)
+                    inTargetSection = currentSection.Equals(section, StringComparison.OrdinalIgnoreCase)
+                    Continue For
+                End If
+
+                ' Delete matching key from target section
+                If inTargetSection AndAlso trimmedLine.Contains("=") Then
+                    Dim equalIndex As Integer = trimmedLine.IndexOf("=")
+                    Dim currentKey As String = trimmedLine.Substring(0, equalIndex).Trim()
+
+                    If currentKey.Equals(key, StringComparison.OrdinalIgnoreCase) Then
+                        lines.RemoveAt(i)
+                        Exit For
+                    End If
+                End If
+            Next
+
+            File.WriteAllLines(filePath, lines, Encoding.UTF8)
+        Catch ex As Exception
+            Throw New Exception("Unable to delete key from INI file: " & ex.Message)
+        End Try
+    End Sub
+
+    Public Sub DeleteSection(section As String)
+        If Not File.Exists(filePath) Then
+            Return
+        End If
+
+        Try
+            Dim lines As New List(Of String)(File.ReadAllLines(filePath))
+            Dim currentSection As String = ""
+            Dim inTargetSection As Boolean = False
+            Dim sectionStartIndex As Integer = -1
+
+            For i As Integer = lines.Count - 1 To 0 Step -1
+                Dim trimmedLine As String = lines(i).Trim()
+
+                ' Check for section headers
+                If trimmedLine.StartsWith("[") AndAlso trimmedLine.EndsWith("]") Then
+                    currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2)
+
+                    If inTargetSection Then
+                        ' We've reached the previous section, stop deleting
+                        inTargetSection = False
+                    ElseIf currentSection.Equals(section, StringComparison.OrdinalIgnoreCase) Then
+                        inTargetSection = True
+                        sectionStartIndex = i
+                    End If
+                End If
+
+                ' Delete lines in target section
+                If inTargetSection Then
+                    lines.RemoveAt(i)
+                End If
+            Next
+
+            File.WriteAllLines(filePath, lines, Encoding.UTF8)
+        Catch ex As Exception
+            Throw New Exception("Unable to delete section from INI file: " & ex.Message)
+        End Try
+    End Sub
+End Class
+
+==================== FILE: RepoBundle.vbproj ====================
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <StartupObject>Sub Main</StartupObject>
+    <UseWindowsForms>true</UseWindowsForms>
+    <MyType>WindowsForms</MyType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="RepoBundle\**" />
+    <EmbeddedResource Remove="RepoBundle\**" />
+    <None Remove="RepoBundle\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Import Include="System.Data" />
+    <Import Include="System.Drawing" />
+    <Import Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="My Project\Application.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+</Project>
+
