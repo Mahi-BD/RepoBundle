@@ -2037,4 +2037,23 @@ Public Class frmMain
         SaveWindowState()
     End Sub
 
+    Private Sub OpenRepoSQLToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OpenRepoSQLToolStripMenuItem.Click
+        Try
+            Dim repoSQLPath As String = Path.Combine(Application.StartupPath, "RepoSQL.exe")
+
+            If File.Exists(repoSQLPath) Then
+                Process.Start(repoSQLPath)
+                toolStripStatusLabel1.Text = "RepoSQL launched successfully"
+            Else
+                MessageBox.Show("RepoSQL.exe not found in application directory." & vbCrLf & vbCrLf &
+                              "Expected location: " & repoSQLPath,
+                              "File Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                toolStripStatusLabel1.Text = "RepoSQL.exe not found"
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show($"Error launching RepoSQL: {ex.Message}", "Launch Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            toolStripStatusLabel1.Text = "Error launching RepoSQL: " & ex.Message
+        End Try
+    End Sub
 End Class

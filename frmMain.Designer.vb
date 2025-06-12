@@ -84,6 +84,7 @@ Partial Class frmMain
         folderBrowserDialog1 = New FolderBrowserDialog()
         openFileDialog1 = New OpenFileDialog()
         saveFileDialog1 = New SaveFileDialog()
+        OpenRepoSQLToolStripMenuItem = New ToolStripMenuItem()
         CType(splitContainer1, ComponentModel.ISupportInitialize).BeginInit()
         splitContainer1.Panel1.SuspendLayout()
         splitContainer1.Panel2.SuspendLayout()
@@ -593,7 +594,7 @@ Partial Class frmMain
         ' 
         ' fileToolStripMenuItem
         ' 
-        fileToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {selectProjectFolderToolStripMenuItem, toolStripSeparator2, backupProjectToolStripMenuItem, goToOutputToolStripMenuItem, toolStripSeparator3, makeShortcutToolStripMenuItem, toolStripSeparator1, exitToolStripMenuItem})
+        fileToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {selectProjectFolderToolStripMenuItem, toolStripSeparator2, backupProjectToolStripMenuItem, goToOutputToolStripMenuItem, OpenRepoSQLToolStripMenuItem, toolStripSeparator3, makeShortcutToolStripMenuItem, toolStripSeparator1, exitToolStripMenuItem})
         fileToolStripMenuItem.Name = "fileToolStripMenuItem"
         fileToolStripMenuItem.Size = New Size(37, 20)
         fileToolStripMenuItem.Text = "&File"
@@ -711,6 +712,12 @@ Partial Class frmMain
         ' 
         saveFileDialog1.Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*"
         saveFileDialog1.Title = "Save combined files to"
+        ' 
+        ' OpenRepoSQLToolStripMenuItem
+        ' 
+        OpenRepoSQLToolStripMenuItem.Name = "OpenRepoSQLToolStripMenuItem"
+        OpenRepoSQLToolStripMenuItem.Size = New Size(181, 22)
+        OpenRepoSQLToolStripMenuItem.Text = "Open RepoSQL"
         ' 
         ' frmMain
         ' 
@@ -835,5 +842,6 @@ Partial Class frmMain
     Friend WithEvents folderBrowserDialog1 As FolderBrowserDialog
     Friend WithEvents openFileDialog1 As OpenFileDialog
     Friend WithEvents saveFileDialog1 As SaveFileDialog
+    Friend WithEvents OpenRepoSQLToolStripMenuItem As ToolStripMenuItem
 
 End Class
