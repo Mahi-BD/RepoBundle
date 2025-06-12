@@ -2039,7 +2039,7 @@ Public Class frmMain
 
     Private Sub OpenRepoSQLToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OpenRepoSQLToolStripMenuItem.Click
         Try
-            Dim repoSQLPath As String = Path.Combine(Application.StartupPath, "RepoSQL.exe")
+            Dim repoSQLPath As String = Path.Combine(Application.StartupPath, "..", "RepoSQL", "RepoSQL.exe")
 
             If File.Exists(repoSQLPath) Then
                 Process.Start(repoSQLPath)
@@ -2054,6 +2054,26 @@ Public Class frmMain
         Catch ex As Exception
             MessageBox.Show($"Error launching RepoSQL: {ex.Message}", "Launch Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
             toolStripStatusLabel1.Text = "Error launching RepoSQL: " & ex.Message
+        End Try
+    End Sub
+
+    Private Sub OpenRepoFTPToolStripMenuItem_Click(sender As Object, e As EventArgs) Handles OpenRepoFTPToolStripMenuItem.Click
+        Try
+            Dim repoFTPPath As String = Path.Combine(Application.StartupPath, "..", "RepoFTP", "RepoFTP.exe")
+
+            If File.Exists(repoFTPPath) Then
+                Process.Start(repoFTPPath)
+                toolStripStatusLabel1.Text = "RepoFTP launched successfully"
+            Else
+                MessageBox.Show("RepoFTP.exe not found in application directory." & vbCrLf & vbCrLf &
+                              "Expected location: " & repoFTPPath,
+                              "File Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                toolStripStatusLabel1.Text = "RepoFTP.exe not found"
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show($"Error launching RepoFTP: {ex.Message}", "Launch Error", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            toolStripStatusLabel1.Text = "Error launching RepoFTP: " & ex.Message
         End Try
     End Sub
 End Class

@@ -69,6 +69,7 @@ Partial Class frmMain
         toolStripSeparator2 = New ToolStripSeparator()
         backupProjectToolStripMenuItem = New ToolStripMenuItem()
         goToOutputToolStripMenuItem = New ToolStripMenuItem()
+        OpenRepoSQLToolStripMenuItem = New ToolStripMenuItem()
         toolStripSeparator3 = New ToolStripSeparator()
         makeShortcutToolStripMenuItem = New ToolStripMenuItem()
         toolStripSeparator1 = New ToolStripSeparator()
@@ -84,7 +85,8 @@ Partial Class frmMain
         folderBrowserDialog1 = New FolderBrowserDialog()
         openFileDialog1 = New OpenFileDialog()
         saveFileDialog1 = New SaveFileDialog()
-        OpenRepoSQLToolStripMenuItem = New ToolStripMenuItem()
+        OpenRepoFTPToolStripMenuItem = New ToolStripMenuItem()
+        ToolStripMenuItem1 = New ToolStripSeparator()
         CType(splitContainer1, ComponentModel.ISupportInitialize).BeginInit()
         splitContainer1.Panel1.SuspendLayout()
         splitContainer1.Panel2.SuspendLayout()
@@ -594,7 +596,7 @@ Partial Class frmMain
         ' 
         ' fileToolStripMenuItem
         ' 
-        fileToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {selectProjectFolderToolStripMenuItem, toolStripSeparator2, backupProjectToolStripMenuItem, goToOutputToolStripMenuItem, OpenRepoSQLToolStripMenuItem, toolStripSeparator3, makeShortcutToolStripMenuItem, toolStripSeparator1, exitToolStripMenuItem})
+        fileToolStripMenuItem.DropDownItems.AddRange(New ToolStripItem() {selectProjectFolderToolStripMenuItem, toolStripSeparator2, backupProjectToolStripMenuItem, goToOutputToolStripMenuItem, ToolStripMenuItem1, OpenRepoSQLToolStripMenuItem, OpenRepoFTPToolStripMenuItem, toolStripSeparator3, makeShortcutToolStripMenuItem, toolStripSeparator1, exitToolStripMenuItem})
         fileToolStripMenuItem.Name = "fileToolStripMenuItem"
         fileToolStripMenuItem.Size = New Size(37, 20)
         fileToolStripMenuItem.Text = "&File"
@@ -621,6 +623,12 @@ Partial Class frmMain
         goToOutputToolStripMenuItem.Name = "goToOutputToolStripMenuItem"
         goToOutputToolStripMenuItem.Size = New Size(181, 22)
         goToOutputToolStripMenuItem.Text = "&Go to Output"
+        ' 
+        ' OpenRepoSQLToolStripMenuItem
+        ' 
+        OpenRepoSQLToolStripMenuItem.Name = "OpenRepoSQLToolStripMenuItem"
+        OpenRepoSQLToolStripMenuItem.Size = New Size(181, 22)
+        OpenRepoSQLToolStripMenuItem.Text = "Open RepoSQL"
         ' 
         ' toolStripSeparator3
         ' 
@@ -713,11 +721,16 @@ Partial Class frmMain
         saveFileDialog1.Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*"
         saveFileDialog1.Title = "Save combined files to"
         ' 
-        ' OpenRepoSQLToolStripMenuItem
+        ' OpenRepoFTPToolStripMenuItem
         ' 
-        OpenRepoSQLToolStripMenuItem.Name = "OpenRepoSQLToolStripMenuItem"
-        OpenRepoSQLToolStripMenuItem.Size = New Size(181, 22)
-        OpenRepoSQLToolStripMenuItem.Text = "Open RepoSQL"
+        OpenRepoFTPToolStripMenuItem.Name = "OpenRepoFTPToolStripMenuItem"
+        OpenRepoFTPToolStripMenuItem.Size = New Size(181, 22)
+        OpenRepoFTPToolStripMenuItem.Text = "Open RepoFTP"
+        ' 
+        ' ToolStripMenuItem1
+        ' 
+        ToolStripMenuItem1.Name = "ToolStripMenuItem1"
+        ToolStripMenuItem1.Size = New Size(178, 6)
         ' 
         ' frmMain
         ' 
@@ -843,5 +856,7 @@ Partial Class frmMain
     Friend WithEvents openFileDialog1 As OpenFileDialog
     Friend WithEvents saveFileDialog1 As SaveFileDialog
     Friend WithEvents OpenRepoSQLToolStripMenuItem As ToolStripMenuItem
+    Friend WithEvents ToolStripMenuItem1 As ToolStripSeparator
+    Friend WithEvents OpenRepoFTPToolStripMenuItem As ToolStripMenuItem
 
 End Class
